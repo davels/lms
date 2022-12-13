@@ -12,8 +12,8 @@
 #    Select      : set current track
 #    Alt-p       : pause
 #    Alt-s       : stop
-#    Alt-[       : prev track
-#    Alt-]       : next track
+#    Alt-k       : prev track
+#    Alt-j       : next track
 #    Ctl-<space> : set current track
 #    Ctl-r       : reload track list
 #
@@ -22,20 +22,24 @@
 #    Ctl-r       : drill down - artists -> albums -> tracks
 #    Alt-p       : pause
 #    Alt-s       : stop
-#    Alt-[       : prev track
-#    Alt-]       : next track
+#    Alt-k       : play prev track
+#    Alt-j       : play next track
+#
 
+
+# option not supported on older fzf versions (ubuntu 20.04)
+export _LMS_EXTRA_ARGS=$(if [ $(echo `fzf --version` | cut -d. -f2) -ge 28 ]; then echo "--header-first"; fi)
 
 lms_nowplaying () {
     local playerargs="-a$LMS_SERVER -n$LMS_PLAYER"
     lms $playerargs -s setcurrent  \
 	$(lms $playerargs -S playing | \
-	      fzf --tac --header-lines=1 --header-first  \
+	      fzf --tac --header-lines=1 $_LMS_EXTRA_ARGS  \
 		  --preview "lms $playerargs -Z playinglistinfo {n}"  \
 		  --bind "alt-p:execute-silent(lms $playerargs pause)+reload(lms $playerargs -S playing)"  \
 		  --bind "alt-s:execute-silent(lms $playerargs stop)+reload(lms $playerargs -S playing)"  \
-		  --bind "alt-[:execute-silent(lms $playerargs prev)+reload(lms $playerargs -S playing)"  \
-		  --bind "alt-]:execute-silent(lms $playerargs next)+reload(lms $playerargs -S playing)"  \
+		  --bind "alt-k:execute-silent(lms $playerargs prev)+reload(lms $playerargs -S playing)"  \
+		  --bind "alt-j:execute-silent(lms $playerargs next)+reload(lms $playerargs -S playing)"  \
 		  --bind "ctrl-space:execute-silent(lms $playerargs -S setcurrent {1})+reload(lms $playerargs -S playing)"  \
 		  --bind "ctrl-r:reload(lms $playerargs -S playing)"
 	)
@@ -62,7 +66,7 @@ lms_search_and_enqueue() { # [$opts...] $search_type $q_method
 	 * )
 	     drilldown="ignore"
     esac
-    #--header=$stype --header-first  \
+    #--header=$stype $_LMS_EXTRA_ARGS  \
     lms $playerargs $searchargs search $stype "${@:3}"  \
 	|  \
 	fzf --tac -m --with-nth="2.." --no-hscroll  \
@@ -71,8 +75,8 @@ lms_search_and_enqueue() { # [$opts...] $search_type $q_method
 	    --bind="ctrl-r:$drilldown"  \
 	    --bind "alt-p:execute-silent(lms $playerargs pause)"  \
 	    --bind "alt-s:execute-silent(lms $playerargs stop)"  \
-	    --bind "alt-[:execute-silent(lms $playerargs prev)"  \
-	    --bind "alt-]:execute-silent(lms $playerargs next)"  \
+	    --bind "alt-k:execute-silent(lms $playerargs prev)"  \
+	    --bind "alt-j:execute-silent(lms $playerargs next)"  \
 	|  \
 	lms $playerargs -t -e"$qmethod" enqueue $stype -
 }
