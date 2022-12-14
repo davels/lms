@@ -28,7 +28,7 @@
 
 
 # option not supported on older fzf versions (ubuntu 20.04)
-export _LMS_EXTRA_ARGS=$(if [ $(echo `fzf --version` | cut -d. -f2) -ge 28 ]; then echo "--header-first"; fi)
+export _LMS_EXTRA_ARGS=$(if [ `fzf --version | ( IFS=". " ; read major minor rest && echo $minor)` -ge 28 ]; then echo "--header-first"; fi)
 
 lms_nowplaying () {
     local playerargs="-a$LMS_SERVER -n$LMS_PLAYER"
