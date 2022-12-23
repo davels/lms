@@ -322,7 +322,10 @@ def dispatch_command(player, args):
         player.playing(args.maxitems)
     elif cmd == 'setcurrent':
         try:
-            curr = int(args.args[0])
+            val = args.args[0]
+            if args.trim_id:
+                val = val[:IDWIDTH].strip()
+            curr = int(val)
         except:
             return  # do nothing if a new current item isn't specified
         player.setcurrent(curr)
