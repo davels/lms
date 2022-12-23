@@ -24,8 +24,8 @@ def _safeint(strval):
 def _format_duration(time):
     minutes,seconds = divmod(int(time),60)
     return '{}:{:02}'.format(int(minutes),int(seconds))
-        
-    
+
+
 class ConnectionError(Exception):
     pass
 
@@ -41,10 +41,10 @@ class Player(object):
         self._mac = None
         self._url = f'http://{self.host}:{self.port}/jsonrpc.js'
         self.find_player()
-        
+
     def __repr__(self):
         return f'LMS Player: {self.name} ({self._mac})'
-    
+
     def __bool__(self):
         return self._mac is not None
 
@@ -60,13 +60,13 @@ class Player(object):
             print("LMS error locating player:", err, file=sys.stderr)
         print("LMS player not found:", self.name, file=sys.stderr)
         return False
-                
+
     def request(self, player="-", params=None):
         req = urllib.request.Request(self._url)
         req.add_header('Content-Type', 'application/json')
 
         if type(params) == str:
-            params = params.split()            
+            params = params.split()
         cmd = [player, params]
         data = {'method': 'slim.request',
                 'params': cmd}
@@ -92,7 +92,7 @@ class Player(object):
 
     def poweroff(self):
         return self.player_request('power 0')
-     
+
     def state(self):
         """Return current player state: ("play", "pause", "stop")"""
         return self.player_request('mode ?', '_mode')
@@ -141,7 +141,7 @@ class Player(object):
             if volume < 0: volume = 0
             elif volume > 100: volume = 100
             self.player_request('mixer volume {volume}')
-    
+
     def track_artist(self):
         """Return the artist for the current playlist item"""
         return self.player_request('artist ?', '_artist')
@@ -149,7 +149,7 @@ class Player(object):
     def track_album(self):
         """Return the album for the current playlist item"""
         return self.player_request('album ?', '_album')
-    
+
     def track_title(self):
         """Return name of the track for the current playlist item"""
         return self.player_request('title ?', '_title')
@@ -179,8 +179,8 @@ class Player(object):
         print('Genre:   ', trackinfo.get('genre',''))
         print('Duration:', _format_duration(trackinfo["duration"]))
         print('Encoding:', trackinfo['type'], trackinfo['bitrate'])
-        print('Filesize:', '{:.1f}.Mb'.format(int(trackinfo['filesize'])/(1024*1024)))        
-    
+        print('Filesize:', '{:.1f}.Mb'.format(int(trackinfo['filesize'])/(1024*1024)))
+
     def playinglistinfo(self, plindex):
         """Print the details for the item with the specified index in the current playlist"""
         if self.natural_indexing: plindex -= 1
@@ -188,12 +188,12 @@ class Player(object):
         if 'playlist_loop' not in res:
             return  # plindex provided is not valid
         self._print_track(res['playlist_loop'][0])
-        
+
     def search_artists(self, term, isfilter=False, maxitems=None):
         if isfilter:
             search = term
         else:
-            search = 'search:' + term if term else ''        
+            search = 'search:' + term if term else ''
         res = self.player_request(f'artists 0 {maxitems} {search}')
         if res['count'] == 0: return
         for artist in res['artists_loop']:
@@ -212,7 +212,7 @@ class Player(object):
     def search_tracks(self, term, isfilter=False, maxitems=None):
         if isfilter:
             search = term
-        else:        
+        else:
             search = 'search:' + term if term else ''
         res = self.player_request(f'tracks 0 {maxitems} tags:a,l {search}')
         if res['count'] == 0: return
@@ -229,7 +229,7 @@ class Player(object):
         if not items:
             return # do nothing if not items are provided
         self.player_request(f'playlistcontrol cmd:{method} {itemtype}_id:{items}')
-        
+
     def enqueue_artists(self, items, method='add'):
         self._enqueue('artist', items, method)
 
@@ -256,7 +256,7 @@ class Player(object):
             else:
                 albumartist = ' - ' + albumartist
             print(f'{album["album"]} ({album.get("year","")}){albumartist}')
-        
+
     def info_albums(self, albumid):
         res = self.player_request(f'tracks 0 9999 tags:a,l,t,g,y,d album_id:{albumid}')
         if not 'titles_loop' in res:
@@ -267,14 +267,14 @@ class Player(object):
         print(f'{tracks[0]["artist"]}')
         for track in tracks:
             dur = _format_duration(track["duration"])
-            print(f'  {track.get("tracknum",""):>2}. {track["title"]}  ({dur})')                
+            print(f'  {track.get("tracknum",""):>2}. {track["title"]}  ({dur})')
 
     def info_tracks(self, trackid):
         res = self.player_request(f'tracks 0 1 tags:a,d,f,g,i,l,o,q,r,t,y track_id:{trackid}')
         if not 'titles_loop' in res:
             return
         self._print_track(res['titles_loop'][0])
-        
+
 def print_status(player, natural_indexing=True):
     res = player.player_request('status')
     state = 'off'
@@ -316,7 +316,7 @@ def dispatch_command(player, args):
     elif cmd in playercmds:
         method = getattr(player, cmd)
         method()
-        
+
     # playing list
     elif cmd == 'playing':
         player.playing(args.maxitems)
@@ -355,7 +355,7 @@ def dispatch_command(player, args):
             if args.trim_id:
                 val = val[:IDWIDTH].strip()
             term = key + ':' + val
-            isfilter = True            
+            isfilter = True
         method = getattr(player, 'search_'+searchtype)
         method(term, isfilter=isfilter, maxitems=args.maxitems)
 
@@ -428,7 +428,7 @@ COMMAND:
     parser.add_argument('-s','--status', action='store_true',
                         help='print a one line status for the player and the end of execution')
     parser.add_argument('-S','--status-header', action='store_true',
-                        help='print a one line status for the player at the start of execution')    
+                        help='print a one line status for the player at the start of execution')
     parser.add_argument('-m','--search-max', type=int, default=9999, dest='maxitems',
                         help='maximum number of search results (default: %(default)s)')
     parser.add_argument('-f','--filter-term', action='store_true',
@@ -439,7 +439,7 @@ COMMAND:
     parser.add_argument('command', nargs='?', default=None,
                         help='player command')
     parser.add_argument('args', nargs='*', help='command arguments')
-    
+
     args = parser.parse_args()
     #print("**", args)
     player = Player(args.player, args.host, args.port)
@@ -447,17 +447,17 @@ COMMAND:
         player.natural_indexing = False
     # status header
     if args.status_header:
-        print_status(player, not args.zero_indexing)        
+        print_status(player, not args.zero_indexing)
     if args.command is not None:
         try:
             dispatch_command(player, args)
         except ArgumentError as err:
             parser.error(str(err))
-    # exit player status 
+    # exit player status
     if args.status:
         print_status(player, not args.zero_indexing)
 
-        
+
 if __name__ == '__main__':
     main()
 
