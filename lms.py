@@ -6,7 +6,7 @@
 # see lms --help
 #
 
-import sys
+import sys, os
 import urllib.request, urllib.parse, urllib.error
 import json
 import argparse
@@ -415,14 +415,16 @@ COMMAND:
 
   NOTE: ITEM for enqueue and info commands is the database id, as returned from search.
 '''
+    default_server = os.environ.get('LMS_DEFAULT_SERVER')
+    default_player = os.environ.get('LMS_DEFAULT_PLAYER')
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                      description='A simple script for interacting with the Logitech Media Server.',
                                      epilog=helpextra)
-    parser.add_argument('-a','--host',
-                        help='LMS hostname', required=True)
+    parser.add_argument('-a','--host', required=not default_server, default=default_server,
+                        help='LMS hostname')
     parser.add_argument('-p','--port', type=int, default=9000,
                         help='LMS port (default: %(default)s)')
-    parser.add_argument('-n','--player', required=True,
+    parser.add_argument('-n','--player', required=not default_player, default=default_player,
                         help='player name')
     parser.add_argument('-Z','--zero-indexing', action='store_true',
                         help='use zero indexing for playlist entries')
