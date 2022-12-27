@@ -31,7 +31,13 @@
 export _LMS_EXTRA_ARGS=$(if [ `fzf --version | ( IFS=". " ; read major minor rest && echo $minor)` -ge 28 ]; then echo "--header-first"; fi)
 
 lms_nowplaying () {
-    local playerargs="-a$LMS_SERVER -n$LMS_PLAYER"
+    local playerargs
+    if [[ -n $LMS_SERVER ]]; then
+        playerargs="$playerargs -a$LMS_SERVER"
+    fi
+    if [[ -n $LMS_PLAYER ]]; then
+        playerargs="$playerargs -n$LMS_PLAYER"
+    fi
     lms $playerargs -s setcurrent  \
 	$(lms $playerargs -S playing | \
 	      fzf --tac --header-lines=1 $_LMS_EXTRA_ARGS  \
@@ -46,7 +52,13 @@ lms_nowplaying () {
 }
 
 lms_search_and_enqueue() { # [$opts...] $search_type $q_method
-    local playerargs="-a$LMS_SERVER -n$LMS_PLAYER"
+    local playerargs
+    if [[ -n $LMS_SERVER ]]; then
+        playerargs="$playerargs -a$LMS_SERVER"
+    fi
+    if [[ -n $LMS_PLAYER ]]; then
+        playerargs="$playerargs -n$LMS_PLAYER"
+    fi
     export -f lms_search_and_enqueue
     local searchargs
     while [[ "$1" == -* ]]; do
