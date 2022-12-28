@@ -1,4 +1,4 @@
-#! /bin/env python
+#! /usr/bin/env python
 #
 # lms - a simple script to interact with the Logitech Media Server
 #
