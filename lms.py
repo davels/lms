@@ -280,7 +280,10 @@ def print_status(player, natural_indexing=True):
     state = 'off'
     if res['power'] == 1:
         state = res['mode']  #play/pause/stop
-    position = f'[{_format_duration(res["time"])}/{_format_duration(res["duration"])}]'
+    if 'time' in res and 'duration' in res:
+        position = f'[{_format_duration(res["time"])}/{_format_duration(res["duration"])}]'
+    else:
+        position = '[-]'
     curtrack = ''
     if 'playlist_cur_index' in res:
         plindex = res["playlist_cur_index"]
