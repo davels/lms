@@ -30,6 +30,19 @@
 # option not supported on older fzf versions (ubuntu 20.04)
 export _LMS_EXTRA_ARGS=$(if [ `fzf --version | ( IFS=". " ; read major minor rest && echo $minor)` -ge 28 ]; then echo "--header-first"; fi)
 
+lms_status ()
+{
+    local playerargs
+    if [[ -n $LMS_SERVER ]]; then
+        playerargs="$playerargs -a$LMS_SERVER"
+    fi
+    if [[ -n $LMS_PLAYER ]]; then
+        playerargs="$playerargs -n$LMS_PLAYER"
+    fi
+
+    lms $playerargs -s
+}
+
 lms_nowplaying () {
     local playerargs
     if [[ -n $LMS_SERVER ]]; then
@@ -38,6 +51,7 @@ lms_nowplaying () {
     if [[ -n $LMS_PLAYER ]]; then
         playerargs="$playerargs -n$LMS_PLAYER"
     fi
+
     lms $playerargs -s setcurrent  \
 	$(lms $playerargs -S playing | \
 	      fzf --tac --header-lines=1 $_LMS_EXTRA_ARGS  \
@@ -93,7 +107,7 @@ lms_search_and_enqueue() { # [$opts...] $search_type $q_method
 	lms $playerargs -t -e"$qmethod" enqueue $stype -
 }
 
-alias fm='lms -a$LMS_SERVER -n$LMS_PLAYER -s'
+alias fm='lms_status'
 alias ff='lms_nowplaying'
 alias fa='lms_search_and_enqueue albums add'
 alias fai='lms_search_and_enqueue albums insert'
