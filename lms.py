@@ -154,9 +154,9 @@ class Player(object):
         """Return name of the track for the current playlist item"""
         return self.player_request('title ?', '_title')
 
-    def playing(self, maxitems=None):
-        """Print all tracks current playist"""
-        res = self.player_request('status 0 99999 tags:a')
+    def playing(self, page=0, pagesize=9999):
+        """Print tracks in the current playist"""
+        res = self.player_request(f'status {page*pagesize} {pagesize} tags:a')
         cur = _safeint(res['playlist_cur_index'])
         if 'playlist_loop' in res:
             for track in res['playlist_loop']:
@@ -189,7 +189,7 @@ class Player(object):
             return  # plindex provided is not valid
         self._print_track(res['playlist_loop'][0])
 
-    def search_artists(self, term, isfilter=False, maxitems=None):
+    def search_artists(self, term, isfilter=False, maxitems=9999):
         if isfilter:
             search = term
         else:
@@ -199,7 +199,7 @@ class Player(object):
         for artist in res['artists_loop']:
             print(f'{artist["id"]:{IDWIDTH}}  {artist["artist"]}')
 
-    def search_albums(self, term, isfilter=False, maxitems=None):
+    def search_albums(self, term, isfilter=False, maxitems=9999):
         if isfilter:
             search = term
         else:
@@ -209,7 +209,7 @@ class Player(object):
         for album in res['albums_loop']:
             print(f'{album["id"]:{IDWIDTH}}  {album["album"]} ({album["year"]})  -  {album["artist"]}')
 
-    def search_tracks(self, term, isfilter=False, maxitems=None):
+    def search_tracks(self, term, isfilter=False, maxitems=9999):
         if isfilter:
             search = term
         else:
@@ -322,7 +322,7 @@ def dispatch_command(player, args):
 
     # playing list
     elif cmd == 'playing':
-        player.playing(args.maxitems)
+        player.playing(0, args.maxitems)
     elif cmd == 'setcurrent':
         try:
             val = args.args[0]
@@ -449,7 +449,6 @@ COMMAND:
     parser.add_argument('args', nargs='*', help='command arguments')
 
     args = parser.parse_args()
-    #print("**", args)
     player = Player(args.player, args.host, args.port)
     if args.zero_indexing:
         player.natural_indexing = False
