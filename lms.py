@@ -88,21 +88,23 @@ class Player(object):
             print(f'LMS player_request "{command}" failed: {err}', file=sys.stderr)
 
     def poweron(self):
+        """Turn the player on."""
         return self.player_request('power 1')
 
     def poweroff(self):
+        """Turn the player off."""
         return self.player_request('power 0')
 
     def state(self):
-        """Return current player state: ("play", "pause", "stop")"""
+        """Return current player state: ("play", "pause", "stop")."""
         return self.player_request('mode ?', '_mode')
 
     def play(self):
-        """Start playing the current item"""
+        """Start playing the current item."""
         self.player_request('play')
 
     def stop(self):
-        """Stop the player"""
+        """Stop the player."""
         self.player_request('stop')
 
     def pause(self):
@@ -114,27 +116,27 @@ class Player(object):
         self.player_request('pause 0')
 
     def toggle_pause(self):
-        """Play/Pause Toggle"""
+        """Play/Pause Toggle."""
         self.player_request('pause')
 
     def next(self):
-        """Play next item in playlist"""
+        """Play next item in playlist."""
         self.player_request('playlist index +1')
 
     def prev(self):
-        """Play previous item in playlist"""
+        """Play previous item in playlist."""
         self.player_request('playlist index -1')
 
     def vup(self, step=10):
-        """Increase the volume"""
+        """Increase the volume."""
         return self.player_request(f'mixer volume +{step}')
 
     def vdown(self, step=10):
-        """Decrease the volume"""
+        """Decrease the volume."""
         return self.player_request(f'mixer volume -{step}')
 
     def volume(self, volume=None):
-        """Print or set the volume"""
+        """Print or set the volume."""
         if not volume:
             print('Volume:', self.player_request('mixer volume ?','_volume'))
         else:
@@ -143,19 +145,19 @@ class Player(object):
             self.player_request('mixer volume {volume}')
 
     def track_artist(self):
-        """Return the artist for the current playlist item"""
+        """Return the artist for the current playlist item."""
         return self.player_request('artist ?', '_artist')
 
     def track_album(self):
-        """Return the album for the current playlist item"""
+        """Return the album for the current playlist item."""
         return self.player_request('album ?', '_album')
 
     def track_title(self):
-        """Return name of the track for the current playlist item"""
+        """Return name of the track for the current playlist item."""
         return self.player_request('title ?', '_title')
 
     def playing(self, page=0, pagesize=9999):
-        """Print tracks in the current playist"""
+        """Print tracks in the current playist."""
         res = self.player_request(f'status {page*pagesize} {pagesize} tags:a')
         cur = _safeint(res['playlist_cur_index'])
         if 'playlist_loop' in res:
@@ -166,7 +168,7 @@ class Player(object):
                 print(f'{plindex:6} {tag} {track["title"]} - {track["artist"]}')
 
     def setcurrent(self, plindex):
-        """Set the current track in the current playlist"""
+        """Set the current track in the current playlist."""
         if self.natural_indexing: plindex -= 1
         self.player_request(f'playlist index {plindex}')
 
@@ -182,7 +184,7 @@ class Player(object):
         print('Filesize:', '{:.1f}.Mb'.format(int(trackinfo['filesize'])/(1024*1024)))
 
     def playinglistinfo(self, plindex):
-        """Print the details for the item with the specified index in the current playlist"""
+        """Print the details for the track with the specified index in the current playlist."""
         if self.natural_indexing: plindex -= 1
         res = self.player_request(f'status {plindex} 1 tags:a,d,f,g,i,l,o,q,r,t,y')
         if 'playlist_loop' not in res:
@@ -227,7 +229,7 @@ class Player(object):
             # read items from stdin
             items = ','.join(line.strip() for line in sys.stdin.readlines())
         if not items:
-            return # do nothing if not items are provided
+            return  # do nothing if not items are provided
         self.player_request(f'playlistcontrol cmd:{method} {itemtype}_id:{items}')
 
     def enqueue_artists(self, items, method='add'):
@@ -245,7 +247,7 @@ class Player(object):
         if 'artists_loop' in res:
             artist = res['artists_loop'][0].get('artist','')
         res = self.player_request(f'albums 0 9999 tags:a,l,y artist_id:{artistid}')
-        if not 'albums_loop' in res:
+        if 'albums_loop' not in res:
             return
         albums = res['albums_loop']
         albums.sort(key=lambda t: t.get('year',-1))
@@ -259,7 +261,7 @@ class Player(object):
 
     def info_albums(self, albumid):
         res = self.player_request(f'tracks 0 9999 tags:a,l,t,g,y,d album_id:{albumid}')
-        if not 'titles_loop' in res:
+        if 'titles_loop' not in res:
             return
         tracks = res['titles_loop']
         tracks.sort(key=lambda t: _safeint(t.get('tracknum',-1)))
@@ -271,15 +273,16 @@ class Player(object):
 
     def info_tracks(self, trackid):
         res = self.player_request(f'tracks 0 1 tags:a,d,f,g,i,l,o,q,r,t,y track_id:{trackid}')
-        if not 'titles_loop' in res:
+        if 'titles_loop' not in res:
             return
         self._print_track(res['titles_loop'][0])
+
 
 def print_status(player, natural_indexing=True):
     res = player.player_request('status')
     state = 'off'
     if res['power'] == 1:
-        state = res['mode']  #play/pause/stop
+        state = res['mode']  # play/pause/stop
     if 'time' in res and 'duration' in res:
         position = f'[{_format_duration(res["time"])}/{_format_duration(res["duration"])}]'
     else:
@@ -289,7 +292,7 @@ def print_status(player, natural_indexing=True):
         plindex = res["playlist_cur_index"]
         if natural_indexing:
             try:
-                plindex  = int(plindex) + 1
+                plindex = int(plindex) + 1
             except:
                 pass
         curtrack = f'{plindex}/{res["playlist_tracks"]}'
@@ -299,6 +302,7 @@ def print_status(player, natural_indexing=True):
             if pl:
                 curtrack += f'.{pl[0]["title"]} - {pl[0]["artist"]}'
     print(f'{player.name} [{state}] {curtrack} {position}')
+
 
 def dispatch_command(player, args):
     playercmds = ['play','pause','stop','next','prev','poweron','poweroff','vup','vdown','volume']
@@ -417,6 +421,10 @@ COMMAND:
   info [artists|albums|tracks] ITEM
 
   NOTE: ITEM for enqueue and info commands is the database id, as returned from search.
+
+ENVIRONMENT VARIABLES:
+  LMS_DEFAULT_SERVER    fallback value to use when HOST is not specified
+  LMS_DEFAULT_PLAYER    fallback value to use when PLAYER is not specified
 '''
     default_server = os.environ.get('LMS_DEFAULT_SERVER')
     default_player = os.environ.get('LMS_DEFAULT_PLAYER')
@@ -443,11 +451,14 @@ COMMAND:
                         help='apply the search term as a filter expression')
     parser.add_argument('-e','--enqueue-method', default='add',
                         choices=['load','insert','add'],
-                        help='enqueueing method')
+                        help='method used to enqueue tracks for the enqueue command (default: add)')
     parser.add_argument('command', nargs='?', default=None,
                         help='player command')
     parser.add_argument('args', nargs='*', help='command arguments')
 
+    if len(sys.argv) < 2:
+        parser.print_help()
+        parser.exit(0)
     args = parser.parse_args()
     player = Player(args.player, args.host, args.port)
     if args.zero_indexing:
