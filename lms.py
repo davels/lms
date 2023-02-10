@@ -222,14 +222,16 @@ class Player(object):
             print(f'{track["id"]:{IDWIDTH}}  {track["title"]}  -  {track["album"]}  -  {track["artist"]}')
 
     def _enqueue(self, itemtype, items, method):
-        if method not in ['load','insert','add']:
-            raise ArgumentError(f'{method} is not a valid enqueue method [load|insert|add]')
+        if method not in ['play','insert','add']:
+            raise ArgumentError(f'{method} is not a valid enqueue method [play|insert|add]')
         items = ','.join(str(itemid) for itemid in items)
         if items == '-':
             # read items from stdin
             items = ','.join(line.strip() for line in sys.stdin.readlines())
         if not items:
             return  # do nothing if not items are provided
+        # server uses 'load' for the play action
+        if method=='play': method='load'
         self.player_request(f'playlistcontrol cmd:{method} {itemtype}_id:{items}')
 
     def enqueue_artists(self, items, method='add'):
@@ -450,7 +452,7 @@ ENVIRONMENT VARIABLES:
     parser.add_argument('-f','--filter-term', action='store_true',
                         help='apply the search term as a filter expression')
     parser.add_argument('-e','--enqueue-method', default='add',
-                        choices=['load','insert','add'],
+                        choices=['play','insert','add'],
                         help='method used to enqueue tracks for the enqueue command (default: add)')
     parser.add_argument('command', nargs='?', default=None,
                         help='player command')
