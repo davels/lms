@@ -74,7 +74,7 @@ class Player(object):
             response = urllib.request.urlopen(req, bytes(json.dumps(data).encode('utf-8')))
             return json.loads(response.read().decode('utf-8'))['result']
         except urllib.error.URLError as err:
-            raise ConnectionError("Could not connect to server.", err)
+            raise ConnectionError("Could not connect to media server.", err)
         except Exception as err:
             raise ConnectionError("Unkown server error", err)
 
@@ -423,15 +423,15 @@ COMMAND:
   NOTE: ITEM for enqueue and info commands is the database id, as returned from search.
 
 ENVIRONMENT VARIABLES:
-  LMS_DEFAULT_SERVER    fallback value to use when HOST is not specified
-  LMS_DEFAULT_PLAYER    fallback value to use when PLAYER is not specified
+  LMS_DEFAULT_HOST    fallback value to use when HOST is not specified
+  LMS_DEFAULT_PLAYER  fallback value to use when PLAYER is not specified
 '''
-    default_server = os.environ.get('LMS_DEFAULT_SERVER')
+    default_host = os.environ.get('LMS_DEFAULT_HOST')
     default_player = os.environ.get('LMS_DEFAULT_PLAYER')
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                      description='A simple script for interacting with the Logitech Media Server.',
                                      epilog=helpextra)
-    parser.add_argument('-a','--host', required=not default_server, default=default_server,
+    parser.add_argument('-a','--host', required=not default_host, default=default_host,
                         help='LMS hostname')
     parser.add_argument('-p','--port', type=int, default=9000,
                         help='LMS port (default: %(default)s)')

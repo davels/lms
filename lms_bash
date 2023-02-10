@@ -4,7 +4,7 @@
 # ensure lms is on PATH
 #    ln -s /path/to/lms.py /usr/local/bin/lms
 # add to .bashrc:
-#   export LMS_SERVER=<server>
+#   export LMS_HOST=<host>
 #   export LMS_PLAYER=<player>
 #   source /path/to/lms_bash
 #
@@ -33,8 +33,8 @@ export _LMS_EXTRA_ARGS=$(if [ `fzf --version | ( IFS=". " ; read major minor res
 lms_status ()
 {
     local playerargs
-    if [[ -n $LMS_SERVER ]]; then
-        playerargs="$playerargs -a$LMS_SERVER"
+    if [[ -n $LMS_HOST ]]; then
+        playerargs="$playerargs -a$LMS_HOST"
     fi
     if [[ -n $LMS_PLAYER ]]; then
         playerargs="$playerargs -n$LMS_PLAYER"
@@ -45,8 +45,8 @@ lms_status ()
 
 lms_nowplaying () {
     local playerargs
-    if [[ -n $LMS_SERVER ]]; then
-        playerargs="$playerargs -a$LMS_SERVER"
+    if [[ -n $LMS_HOST ]]; then
+        playerargs="$playerargs -a$LMS_HOST"
     fi
     if [[ -n $LMS_PLAYER ]]; then
         playerargs="$playerargs -n$LMS_PLAYER"
@@ -67,8 +67,8 @@ lms_nowplaying () {
 
 lms_search_and_enqueue() { # [$opts...] $search_type $q_method
     local playerargs
-    if [[ -n $LMS_SERVER ]]; then
-        playerargs="$playerargs -a$LMS_SERVER"
+    if [[ -n $LMS_HOST ]]; then
+        playerargs="$playerargs -a$LMS_HOST"
     fi
     if [[ -n $LMS_PLAYER ]]; then
         playerargs="$playerargs -n$LMS_PLAYER"

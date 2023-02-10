@@ -19,7 +19,7 @@ As well as commands for searching the music database, `search`, and adding track
 > lms --help
 ```
 
-Set `LMS_DEFAULT_SERVER` and `LMS_DEFAULT_PLAYER` environment variables to simplify usage.
+Set `LMS_DEFAULT_HOST` and `LMS_DEFAULT_PLAYER` environment variables to simplify usage.
 
 ## Extras ##
 
