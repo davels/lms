@@ -183,7 +183,7 @@ class Player(object):
         print('Encoding:', trackinfo['type'], trackinfo['bitrate'])
         print('Filesize:', '{:.1f}.Mb'.format(int(trackinfo['filesize'])/(1024*1024)))
 
-    def playinglistinfo(self, plindex):
+    def playinginfo(self, plindex):
         """Print the details for the track with the specified index in the current playlist."""
         if self.natural_indexing: plindex -= 1
         res = self.player_request(f'status {plindex} 1 tags:a,d,f,g,i,l,o,q,r,t,y')
@@ -338,12 +338,12 @@ def dispatch_command(player, args):
         except:
             return  # do nothing if a new current item isn't specified
         player.setcurrent(curr)
-    elif cmd == 'playinglistinfo':
+    elif cmd == 'playinginfo':
         try:
             item = int(args.args[0])
         except:
             return  # do nothing if a playlist item isn't specified
-        player.playinglistinfo(item)
+        player.playinginfo(item)
 
     # search
     elif cmd == 'search':
@@ -417,7 +417,7 @@ COMMAND:
   volume [n]
   playing
   setcurrent <n>
-  playinglistinfo <n>
+  playinginfo <n>
   search [artists|albums|tracks] TERM
   enqueue [artists|albums|tracks] ITEMS
   info [artists|albums|tracks] ITEM

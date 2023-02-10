@@ -55,7 +55,7 @@ lms_nowplaying () {
     lms $playerargs -s setcurrent  \
 	$(lms $playerargs -S playing | \
 	      fzf --tac --header-lines=1 $_LMS_EXTRA_ARGS  \
-		  --preview "lms $playerargs -Z playinglistinfo {n}"  \
+		  --preview "lms $playerargs -Z playinginfo {n}"  \
 		  --bind "alt-p:execute-silent(lms $playerargs pause)+reload(lms $playerargs -S playing)"  \
 		  --bind "alt-s:execute-silent(lms $playerargs stop)+reload(lms $playerargs -S playing)"  \
 		  --bind "alt-k:execute-silent(lms $playerargs prev)+reload(lms $playerargs -S playing)"  \
