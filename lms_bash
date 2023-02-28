@@ -84,10 +84,10 @@ lms_search_and_enqueue() { # [$opts...] $search_type $q_method
     local drilldown
     case $stype in
 	 artists )
-	     drilldown="execute(lms_search_and_enqueue -ft albums $qmethod artist_id:{})"
+	     drilldown="execute(lms_search_and_enqueue -rt albums $qmethod artist_id:{})"
 	     ;;
 	 albums )
-	     drilldown="execute(lms_search_and_enqueue -ft tracks $qmethod album_id:{})"
+	     drilldown="execute(lms_search_and_enqueue -rt tracks $qmethod album_id:{})"
 	     ;;
 	 * )
 	     drilldown="ignore"

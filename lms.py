@@ -191,8 +191,8 @@ class Player(object):
             return  # plindex provided is not valid
         self._print_track(res['playlist_loop'][0])
 
-    def search_artists(self, term, isfilter=False, maxitems=9999):
-        if isfilter:
+    def search_artists(self, term, isparam=False, maxitems=9999):
+        if isparam:
             search = term
         else:
             search = 'search:' + term if term else ''
@@ -201,8 +201,8 @@ class Player(object):
         for artist in res['artists_loop']:
             print(f'{artist["id"]:{IDWIDTH}}  {artist["artist"]}')
 
-    def search_albums(self, term, isfilter=False, maxitems=9999):
-        if isfilter:
+    def search_albums(self, term, isparam=False, maxitems=9999):
+        if isparam:
             search = term
         else:
             search = 'search:' + term if term else ''
@@ -211,8 +211,8 @@ class Player(object):
         for album in res['albums_loop']:
             print(f'{album["id"]:{IDWIDTH}}  {album["album"]} ({album["year"]})  -  {album["artist"]}')
 
-    def search_tracks(self, term, isfilter=False, maxitems=9999):
-        if isfilter:
+    def search_tracks(self, term, isparam=False, maxitems=9999):
+        if isparam:
             search = term
         else:
             search = 'search:' + term if term else ''
@@ -353,23 +353,22 @@ def dispatch_command(player, args):
         if searchtype not in ['artists','albums','tracks']:
             raise ArgumentError(f'{searchtype} is not a valid search type [artists|albums|tracks]')
         term = args.args[1] if len(args.args) > 1 else None
-        isfilter = False
-        if term and args.filter_term:
+        isparam = False
+        if term and args.param_search:
             parts = term.split(':',1)
             if len(parts) < 2:
                 raise ArgumentError('Not a valid filter expression')
             key = parts[0].lower()
             val = parts[1]
-            keymap = {'artists':'artist_id','albums':'album_id','tracks':'track_id'}
-            key = keymap.get(key,key)
-            if key not in keymap.values():
-                raise ArgumentError(f'{key} is not a valid filter type [{",".join(keymap.values())}]')
+            paramkeys = ('artist_id','album_id','track_id')
+            if key not in paramkeys:
+                raise ArgumentError(f'{key} is not a valid search parameter [{",".join(paramkeys)}]')
             if args.trim_id:
                 val = val[:IDWIDTH].strip()
             term = key + ':' + val
-            isfilter = True
+            isparam = True
         method = getattr(player, 'search_'+searchtype)
-        method(term, isfilter=isfilter, maxitems=args.maxitems)
+        method(term, isparam=isparam, maxitems=args.maxitems)
 
     # enqueue
     elif cmd == 'enqueue':
@@ -424,6 +423,13 @@ COMMAND:
 
   NOTE: ITEM for enqueue and info commands is the database id, as returned from search.
 
+PARAMETER SEARCH
+  with the --param_search option the search method is changed from text match to a
+  parameter search.  Permitted searches are:
+    artist_id:<id>
+    album_id:<id>
+    track_id:<id>
+
 ENVIRONMENT VARIABLES:
   LMS_DEFAULT_HOST    fallback value to use when HOST is not specified
   LMS_DEFAULT_PLAYER  fallback value to use when PLAYER is not specified
@@ -449,8 +455,8 @@ ENVIRONMENT VARIABLES:
                         help='print a one line status for the player at the start of execution')
     parser.add_argument('-m','--search-max', type=int, default=9999, dest='maxitems',
                         help='maximum number of search results (default: %(default)s)')
-    parser.add_argument('-f','--filter-term', action='store_true',
-                        help='apply the search term as a filter expression')
+    parser.add_argument('-r','--param-search', action='store_true',
+                        help='search term is a key:value search parameter')
     parser.add_argument('-e','--enqueue-method', default='add',
                         choices=['play','insert','add'],
                         help='method used to enqueue tracks for the enqueue command (default: add)')
