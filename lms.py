@@ -159,13 +159,13 @@ class Player(object):
     def playing(self, page=0, pagesize=9999):
         """Print tracks in the current playist."""
         res = self.player_request(f'status {page*pagesize} {pagesize} tags:a')
-        cur = _safeint(res['playlist_cur_index'])
-        if 'playlist_loop' in res:
-            for track in res['playlist_loop']:
-                tag = '*' if track["playlist index"]==cur else " "
-                plindex = track["playlist index"]
-                if self.natural_indexing: plindex+=1
-                print(f'{plindex:6} {tag} {track["title"]} - {track["artist"]}')
+        if res['playlist_tracks'] == 0: return
+        cur = _safeint(res.get('playlist_cur_index', -1))
+        for track in res['playlist_loop']:
+            tag = '*' if track["playlist index"]==cur else " "
+            plindex = track["playlist index"]
+            if self.natural_indexing: plindex+=1
+            print(f'{plindex:6} {tag} {track["title"]} - {track["artist"]}')
 
     def setcurrent(self, plindex):
         """Set the current track in the current playlist."""
