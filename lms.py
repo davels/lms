@@ -37,6 +37,7 @@ class Player(object):
         self.host = host
         self.port = port
         self.name = name
+        self.trim_id = False
         self.natural_indexing = True
         self._mac = None
         self._url = f'http://{self.host}:{self.port}/jsonrpc.js'
@@ -191,31 +192,38 @@ class Player(object):
             return  # plindex provided is not valid
         self._print_track(res['playlist_loop'][0])
 
-    def search_artists(self, term, isparam=False, maxitems=9999):
-        if isparam:
-            search = term
+    def _build_search(self, term, param):
+        if term == "-":
+            # read term from stdin
+            term = sys.stdin.readline().strip()
+        if self.trim_id:
+            term = term[:IDWIDTH].strip()
         else:
-            search = 'search:' + term if term else ''
+            term = term.strip() if term else ''
+        if param:
+            search = param + ":" + term
+        elif term:
+            search = 'search:' + term
+        else:
+            search = ''
+        return search
+
+    def search_artists(self, term, param=None, maxitems=9999):
+        search = self._build_search(term, param)
         res = self.player_request(f'artists 0 {maxitems} {search}')
         if res['count'] == 0: return
         for artist in res['artists_loop']:
             print(f'{artist["id"]:{IDWIDTH}}  {artist["artist"]}')
 
-    def search_albums(self, term, isparam=False, maxitems=9999):
-        if isparam:
-            search = term
-        else:
-            search = 'search:' + term if term else ''
+    def search_albums(self, term, param=None, maxitems=9999):
+        search = self._build_search(term, param)
         res = self.player_request(f'albums 0 {maxitems} tags:a,y,l {search}')
         if res['count'] == 0: return
         for album in res['albums_loop']:
             print(f'{album["id"]:{IDWIDTH}}  {album["album"]} ({album["year"]})  -  {album["artist"]}')
 
-    def search_tracks(self, term, isparam=False, maxitems=9999):
-        if isparam:
-            search = term
-        else:
-            search = 'search:' + term if term else ''
+    def search_tracks(self, term, param=None, maxitems=9999):
+        search = self._build_search(term, param)
         res = self.player_request(f'tracks 0 {maxitems} tags:a,l {search}')
         if res['count'] == 0: return
         for track in res['titles_loop']:
@@ -224,15 +232,18 @@ class Player(object):
     def _enqueue(self, itemtype, items, method):
         if method not in ['play','insert','add']:
             raise ArgumentError(f'{method} is not a valid enqueue method [play|insert|add]')
-        items = ','.join(str(itemid) for itemid in items)
-        if items == '-':
+        if items == ['-']:
             # read items from stdin
-            items = ','.join(line.strip() for line in sys.stdin.readlines())
+            items = sys.stdin.readlines()
+        items = [iid[0] for item in items if (iid:=str(item).split(maxsplit=1))]
         if not items:
-            return  # do nothing if not items are provided
+            return  # do nothing if no items are provided
         # server uses 'load' for the play action
         if method=='play': method='load'
-        self.player_request(f'playlistcontrol cmd:{method} {itemtype}_id:{items}')
+        # track is special and allows a comma separated list of ids
+        if itemtype=='track': items = [','.join(items)]
+        for itemid in items:
+            self.player_request(f'playlistcontrol cmd:{method} {itemtype}_id:{itemid}')
 
     def enqueue_artists(self, items, method='add'):
         self._enqueue('artist', items, method)
@@ -353,22 +364,18 @@ def dispatch_command(player, args):
         if searchtype not in ['artists','albums','tracks']:
             raise ArgumentError(f'{searchtype} is not a valid search type [artists|albums|tracks]')
         term = args.args[1] if len(args.args) > 1 else None
-        isparam = False
+        param = None
         if term and args.param_search:
+            paramkeys = ('artist_id','album_id','track_id')
             parts = term.split(':',1)
             if len(parts) < 2:
-                raise ArgumentError('Not a valid filter expression')
-            key = parts[0].lower()
-            val = parts[1]
-            paramkeys = ('artist_id','album_id','track_id')
-            if key not in paramkeys:
-                raise ArgumentError(f'{key} is not a valid search parameter [{",".join(paramkeys)}]')
-            if args.trim_id:
-                val = val[:IDWIDTH].strip()
-            term = key + ':' + val
-            isparam = True
+                raise ArgumentError('Not a valid search expression:', term)
+            param = parts[0].lower()
+            term = parts[1]
+            if param not in paramkeys:
+                raise ArgumentError(f'{param} is not a valid search parameter [{",".join(paramkeys)}]')
         method = getattr(player, 'search_'+searchtype)
-        method(term, isparam=isparam, maxitems=args.maxitems)
+        method(term, param=param, maxitems=args.maxitems)
 
     # enqueue
     elif cmd == 'enqueue':
@@ -424,11 +431,12 @@ COMMAND:
   NOTE: ITEM for enqueue and info commands is the database id, as returned from search.
 
 PARAMETER SEARCH
-  with the --param_search option the search method is changed from text match to a
-  parameter search.  Permitted searches are:
-    artist_id:<id>
-    album_id:<id>
-    track_id:<id>
+  The --param-search option changes the search method from text match to a parameter
+  search. Permitted parameters are the following, each of which include a numberic id as
+  returned from search.
+    artist_id:<n>
+    album_id:<n>
+    track_id:<n>
 
 ENVIRONMENT VARIABLES:
   LMS_DEFAULT_HOST    fallback value to use when HOST is not specified
@@ -468,7 +476,10 @@ ENVIRONMENT VARIABLES:
         parser.print_help()
         parser.exit(0)
     args = parser.parse_args()
+
     player = Player(args.player, args.host, args.port)
+    if args.trim_id:
+        player.trim_id = True
     if args.zero_indexing:
         player.natural_indexing = False
     # status header
