@@ -1,16 +1,17 @@
-####
+####                               -*- mode: shell-script -*-
 # bash support for the python lms script
 #
+# requires fzf
 # ensure lms is on PATH
 #    ln -s /path/to/lms.py /usr/local/bin/lms
-# add to .bashrc:
+# add to .bashrc: (or use LMS_DEFAULT_HOST and LMS_DEFAULT_PLAYER)
 #   export LMS_HOST=<host>
 #   export LMS_PLAYER=<player>
 #   source /path/to/lms_bash
 #
 # lms_nowplaying - show the current playlist
 #    Select      : set current track
-#    Alt-p       : pause
+#    Alt-x       : pause
 #    Alt-s       : stop
 #    Alt-k       : prev track
 #    Alt-j       : next track
@@ -18,9 +19,12 @@
 #    Ctl-r       : reload track list
 #
 # lms_search_and_enqueue - search for tracks and add them to the current playlist
-#    Select      : enqueue current/marked tracks
-#    Ctl-r       : drill down - artists -> albums -> tracks
-#    Alt-p       : pause
+#    <enter>     : drill down - artists -> albums -> tracks
+#    Alt-a       : add selected/marked tracks to playlist
+#    Alt-t       : insert selected/marked tracks into playlist after current track
+#    Alt-p       : play selected/marked tracks
+#    Alt-l       : view current playlist
+#    Alt-x       : pause
 #    Alt-s       : stop
 #    Alt-k       : play prev track
 #    Alt-j       : play next track
@@ -56,7 +60,7 @@ lms_nowplaying () {
 	$(lms $playerargs -S playing | \
 	      fzf --tac --header-lines=1 $_LMS_EXTRA_ARGS  \
 		  --preview "lms $playerargs -Z playinginfo {n}"  \
-		  --bind "alt-p:execute-silent(lms $playerargs pause)+reload(lms $playerargs -S playing)"  \
+		  --bind "alt-x:execute-silent(lms $playerargs pause)+reload(lms $playerargs -S playing)"  \
 		  --bind "alt-s:execute-silent(lms $playerargs stop)+reload(lms $playerargs -S playing)"  \
 		  --bind "alt-k:execute-silent(lms $playerargs prev)+reload(lms $playerargs -S playing)"  \
 		  --bind "alt-j:execute-silent(lms $playerargs next)+reload(lms $playerargs -S playing)"  \
@@ -65,7 +69,7 @@ lms_nowplaying () {
 	)
 }
 
-lms_search_and_enqueue() { # [$opts...] $search_type $q_method
+lms_search_and_enqueue() { # [$opts...] $search_type $terms...
     local playerargs
     if [[ -n $LMS_HOST ]]; then
         playerargs="$playerargs -a$LMS_HOST"
@@ -76,46 +80,41 @@ lms_search_and_enqueue() { # [$opts...] $search_type $q_method
     export -f lms_search_and_enqueue
     local searchargs
     while [[ "$1" == -* ]]; do
-	searchargs="$1 $searchargs"
-	shift
+	    searchargs="$1 $searchargs"
+	    shift
     done
     local stype=$1
-    local qmethod=$2
-    local drilldown
+    local action
     case $stype in
 	 artists )
-	     drilldown="execute(lms_search_and_enqueue -rt albums $qmethod artist_id:{})"
+         action="execute:(lms_search_and_enqueue -r albums artist_id:{1})"
 	     ;;
 	 albums )
-	     drilldown="execute(lms_search_and_enqueue -rt tracks $qmethod album_id:{})"
+	     action="execute:(lms_search_and_enqueue -r tracks album_id:{1})"
 	     ;;
 	 * )
-	     drilldown="ignore"
+	     action="execute-silent:(ignore)"
     esac
     #--header=$stype $_LMS_EXTRA_ARGS  \
-    lms $playerargs $searchargs search $stype "${@:3}"  \
+    lms $playerargs $searchargs search $stype "${@:2}"  \
 	|  \
 	fzf --tac -m --with-nth="2.." --no-hscroll  \
 	    --prompt="$stype> "  \
 	    --preview="lms $playerargs info $stype {1}"  \
-	    --bind="ctrl-r:$drilldown"  \
-	    --bind "alt-p:execute-silent(lms $playerargs pause)"  \
+	    --bind "alt-a:execute-silent(lms $playerargs -e add enqueue $stype {+1})+preview:echo -e \"Adding to playlist...\n{+2..}\""  \
+	    --bind "alt-t:execute-silent(lms $playerargs -e insert enqueue $stype {+1})+preview:echo -e \"Inserting into playlist...\n{+2..}\""  \
+	    --bind "alt-p:execute-silent(lms $playerargs -e play enqueue $stype {+1})+preview:echo -e \"Playing...\n{+2..}\""  \
+        --bind "alt-l:execute(echo '' && lms $playerargs -s playing && read -p '  <Press Enter to continue>' </dev/tty)"  \
+	    --bind "alt-x:execute-silent(lms $playerargs pause)"  \
 	    --bind "alt-s:execute-silent(lms $playerargs stop)"  \
 	    --bind "alt-k:execute-silent(lms $playerargs prev)"  \
 	    --bind "alt-j:execute-silent(lms $playerargs next)"  \
-	|  \
-	lms $playerargs -t -e"$qmethod" enqueue $stype -
+        --bind "enter:execute:($action)"
 }
 
 alias fm='lms_status'
 alias ff='lms_nowplaying'
-alias fa='lms_search_and_enqueue albums add'
-alias fai='lms_search_and_enqueue albums insert'
-alias fal='lms_search_and_enqueue albums play'
-alias fr='lms_search_and_enqueue artists add'
-alias fri='lms_search_and_enqueue artists insert'
-alias frl='lms_search_and_enqueue artists play'
-alias ft='lms_search_and_enqueue tracks add'
-alias fti='lms_search_and_enqueue tracks insert'
-alias ftl='lms_search_and_enqueue tracks play'
+alias fa='lms_search_and_enqueue albums'
+alias fr='lms_search_and_enqueue artists'
+alias ft='lms_search_and_enqueue tracks'
 
