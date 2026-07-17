@@ -109,7 +109,7 @@ lms_search_and_enqueue() { # [$opts...] $search_type $terms...
 	    --bind "alt-s:execute-silent(lms $playerargs stop)"  \
 	    --bind "alt-k:execute-silent(lms $playerargs prev)"  \
 	    --bind "alt-j:execute-silent(lms $playerargs next)"  \
-        --bind "enter:execute:($action)"
+        --bind "enter:$action"
 }
 
 alias fm='lms_status'
