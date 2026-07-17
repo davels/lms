@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 #
-# lms - a simple script to interact with the Logitech Media Server
+# lms - a simple script to interact with the Lyrion Music Server
 #
 # USAGE
 # see lms --help
@@ -97,7 +97,7 @@ class Player(object):
         return self.player_request('power 0')
 
     def state(self):
-        """Return current player state: ("play", "pause", "stop")."""
+        """Return current playing state: ("play", "pause", "stop")."""
         return self.player_request('mode ?', '_mode')
 
     def play(self):

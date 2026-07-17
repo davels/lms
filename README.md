@@ -1,6 +1,6 @@
 # lms
 
-A simple python script for interacting with the Logitech Media Server using the command line.
+A simple python script for interacting with the Lyrion Music Server using the command line.
 
 To install just place lms.py somewhere in your path and optionally create an lms symlink
 ``` shell
@@ -8,6 +8,7 @@ To install just place lms.py somewhere in your path and optionally create an lms
 ```
 There are basic commands
 
+- status
 - play
 - pause
 - next

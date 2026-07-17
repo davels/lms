@@ -1,10 +1,10 @@
-####                               -*- mode: shell-script -*-
+####                               -*- mode: sh; sh-shell: bash; -*-
 # bash support for the python lms script
 #
 # requires fzf
 # ensure lms is on PATH
 #    ln -s /path/to/lms.py /usr/local/bin/lms
-# add to .bashrc: (or use LMS_DEFAULT_HOST and LMS_DEFAULT_PLAYER)
+# add to .bashrc: (or rely on LMS_DEFAULT_HOST and LMS_DEFAULT_PLAYER)
 #   export LMS_HOST=<host>
 #   export LMS_PLAYER=<player>
 #   source /path/to/lms_bash
@@ -114,7 +114,7 @@ lms_search_and_enqueue() { # [$opts...] $search_type $terms...
 
 alias fm='lms_status'
 alias ff='lms_nowplaying'
-alias fa='lms_search_and_enqueue albums'
-alias fr='lms_search_and_enqueue artists'
+alias fb='lms_search_and_enqueue albums'
+alias fa='lms_search_and_enqueue artists'
 alias ft='lms_search_and_enqueue tracks'
 
