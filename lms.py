@@ -11,6 +11,9 @@ import urllib.request, urllib.parse, urllib.error
 import json
 import argparse
 
+# ensure proper handling of utf8 tags
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 
 # width of column 0 that holds the id of each output line from search commands
 IDWIDTH = 8
