@@ -318,7 +318,7 @@ def print_status(player, natural_indexing=True):
 
 
 def dispatch_command(player, args):
-    playercmds = ['play','pause','stop','next','prev','poweron','poweroff','vup','vdown','volume']
+    playercmds = ['status','play','pause','stop','next','prev','poweron','poweroff','vup','vdown','volume']
     cmd = args.command.lower()
     if cmd not in playercmds:
         # look for a unique command prefix match
@@ -331,7 +331,9 @@ def dispatch_command(player, args):
                 cmdmatch = c
         if cmdmatch: cmd = cmdmatch
     # basic commands
-    if cmd == 'pause':  # special case
+    if cmd == 'status':
+        print_status(player)
+    elif cmd == 'pause':  # special case
         player.toggle_pause()
     elif cmd in playercmds:
         method = getattr(player, cmd)
@@ -411,6 +413,7 @@ def dispatch_command(player, args):
 def main():
     helpextra = '''
 COMMAND:
+  status
   play
   pause
   stop
