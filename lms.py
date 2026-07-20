@@ -325,14 +325,15 @@ def dispatch_command(player, args):
     cmd = args.command.lower()
     if cmd not in playercmds:
         # look for a unique command prefix match
-        cmdmatch = None
-        for c in playercmds:
-            if c.startswith(cmd):
-                if cmdmatch:
-                    cmdmatch = None  # not a unique match
-                    break
-                cmdmatch = c
-        if cmdmatch: cmd = cmdmatch
+        match = None
+        for cand in playercmds:
+            if cand.startswith(cmd):
+                if match is not None:
+                    raise ArgumentError(f"command prefix is not unique '{cmd}'")
+                match = cand
+        if match is not None:
+            cmd = match
+
     # basic commands
     if cmd == 'status':
         print_status(player)
