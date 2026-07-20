@@ -18,6 +18,20 @@ sys.stderr.reconfigure(encoding="utf-8")
 # width of column 0 that holds the id of each output line from search commands
 IDWIDTH = 8
 
+
+class LMSError(Exception):
+    pass
+
+class LMSConnectionError(LMSError):
+    pass
+
+class LMSRequestError(LMSError):
+    pass
+
+class LMSArgumentError(LMSError):
+    pass
+
+
 def _safeint(strval):
     try:
         return int(strval)
@@ -28,12 +42,6 @@ def _format_duration(time):
     minutes,seconds = divmod(int(time),60)
     return '{}:{:02}'.format(int(minutes),int(seconds))
 
-
-class ConnectionError(Exception):
-    pass
-
-class ArgumentError(Exception):
-    pass
 
 class Player(object):
     def __init__(self, name, host="localhost", port="9000"):
@@ -60,7 +68,7 @@ class Player(object):
                 if pinfo['name'].lower() == lname:
                     self._mac = pinfo['playerid']
                     return True
-        except ConnectionError as err:
+        except LMSConnectionError as err:
             print("LMS error locating player:", err, file=sys.stderr)
         print("LMS player not found:", self.name, file=sys.stderr)
         return False
@@ -78,9 +86,9 @@ class Player(object):
             response = urllib.request.urlopen(req, bytes(json.dumps(data).encode('utf-8')))
             return json.loads(response.read().decode('utf-8'))['result']
         except urllib.error.URLError as err:
-            raise ConnectionError("Could not connect to media server.", err)
+            raise LMSConnectionError(f'Could not connect to media server: {err}') from err
         except Exception as err:
-            raise ConnectionError("Unkown server error", err)
+            raise LMSConnectionError(f'Unkown server error: {err}') from err
 
     def player_request(self, command, key=None):
         try:
@@ -88,8 +96,8 @@ class Player(object):
             if key:
                 return res[key]
             return res
-        except BaseException as err:
-            print(f'LMS player_request "{command}" failed: {err}', file=sys.stderr)
+        except Exception as err:
+            raise LMSRequestError(f'LMS player_request "{command}" failed: {err}') from err
 
     def poweron(self):
         """Turn the player on."""
@@ -141,12 +149,12 @@ class Player(object):
 
     def volume(self, volume=None):
         """Print or set the volume."""
-        if not volume:
+        if volume is None:
             print('Volume:', self.player_request('mixer volume ?','_volume'))
         else:
             if volume < 0: volume = 0
             elif volume > 100: volume = 100
-            self.player_request('mixer volume {volume}')
+            self.player_request(f'mixer volume {volume}')
 
     def track_artist(self):
         """Return the artist for the current playlist item."""
@@ -234,7 +242,7 @@ class Player(object):
 
     def _enqueue(self, itemtype, items, method):
         if method not in ['play','insert','add']:
-            raise ArgumentError(f'{method} is not a valid enqueue method [play|insert|add]')
+            raise LMSArgumentError(f'{method} is not a valid enqueue method [play|insert|add]')
         if items == ['-']:
             # read items from stdin
             items = sys.stdin.readlines()
@@ -309,8 +317,8 @@ def print_status(player, natural_indexing=True):
         if natural_indexing:
             try:
                 plindex = int(plindex) + 1
-            except:
-                pass
+            except BaseException as err:
+                raise LMSError(f'Invalid playlist index returned from status: {plindex}') from err
         curtrack = f'{plindex}/{res["playlist_tracks"]}'
         res = player.player_request(f'status {res["playlist_cur_index"]} 1 tags:a')
         if 'playlist_loop' in res:
@@ -318,6 +326,81 @@ def print_status(player, natural_indexing=True):
             if pl:
                 curtrack += f'.{pl[0]["title"]} - {pl[0]["artist"]}'
     print(f'{player.name} [{state}] {curtrack} {position}')
+
+
+def command_setcurrent(player, args):
+    if len(args.args) < 1:
+        raise LMSArgumentError('Missing index for setcurrent')
+    try:
+        val = args.args[0]
+        if args.trim_id:
+            val = val[:IDWIDTH].strip()
+        curr = int(val)
+    except BaseException as err:
+        raise LMSArgumentError(f'Invalid index for setcurrent: {args.args[0]}') from err
+    player.setcurrent(curr)
+
+
+def command_playinginfo(player, args):
+    if len(args.args) < 1:
+        raise LMSArgumentError('Missing index for playinginfo')
+    try:
+        item = int(args.args[0])
+    except BaseException as err:
+        raise LMSArgumentError(f'Invalid index for playinginfo: {args.args[0]}') from err
+    player.playinginfo(item)
+
+
+def command_search(player, args):
+    if len(args.args) < 1:
+        raise LMSArgumentError('no search type specified [artists|albums|tracks]')
+    searchtype = args.args[0].lower()
+    if searchtype not in ['artists','albums','tracks']:
+        raise LMSArgumentError(f'{searchtype} is not a valid search type [artists|albums|tracks]')
+    term = args.args[1] if len(args.args) > 1 else None
+    param = None
+    if term and args.param_search:
+        paramkeys = ('artist_id','album_id','track_id')
+        parts = term.split(':',1)
+        if len(parts) < 2:
+            raise LMSArgumentError(f'Not a valid search expression: {term}')
+        param = parts[0].lower()
+        term = parts[1]
+        if param not in paramkeys:
+            raise LMSArgumentError(f'{param} is not a valid search parameter [{",".join(paramkeys)}]')
+    method = getattr(player, 'search_'+searchtype)
+    method(term, param=param, maxitems=args.maxitems)
+
+
+def command_enqueue(player, args):
+    if len(args.args) < 1:
+        raise LMSArgumentError('no enqueue item type specified [artists|albums|tracks]')
+    if len(args.args) < 2:
+        raise LMSArgumentError('no item specified for enqueue')
+    itype = args.args[0].lower()
+    items = args.args[1:]
+    if itype not in ['artists','albums','tracks']:
+        raise LMSArgumentError(f'{itype} is not a valid item type [artists|albums|tracks]')
+    if not items: return
+    method = getattr(player, 'enqueue_'+itype)
+    method(items, args.enqueue_method)
+
+
+def command_info(player, args):
+    print(len(args.args), args.args)
+    if len(args.args) < 1:
+        raise LMSArgumentError('no info type specified [artists|albums|tracks]')
+    if len(args.args) < 2:
+        raise LMSArgumentError('no item specified for info')
+    itype = args.args[0].lower()
+    itemid = args.args[1]
+    if itype not in ['artists','albums','tracks']:
+        raise LMSArgumentError(f'{itype} is not a valid item type [artist|album|track]')
+    if args.trim_id:
+        itemid = itemid[:IDWIDTH].strip()
+    if not itemid: return
+    method = getattr(player, 'info_'+itype)
+    method(itemid)
 
 
 def dispatch_command(player, args):
@@ -329,89 +412,54 @@ def dispatch_command(player, args):
         for cand in playercmds:
             if cand.startswith(cmd):
                 if match is not None:
-                    raise ArgumentError(f"command prefix is not unique '{cmd}'")
+                    raise LMSArgumentError(f"command prefix is not unique '{cmd}'")
                 match = cand
         if match is not None:
             cmd = match
-
-    # basic commands
+    # special case player commands
     if cmd == 'status':
         print_status(player)
-    elif cmd == 'pause':  # special case
+    elif cmd == 'pause':
         player.toggle_pause()
+    elif cmd == 'volume':
+        vol = None  # print the volume if nothing specified
+        if len(args.args) > 0:
+            try:
+                vol = int(args.args[0])
+            except ValueError:
+                raise LMSArgumentError(f"volume must be a number '{args.args[0]}'")
+        player.volume(vol)
+    # standard player commands
     elif cmd in playercmds:
         method = getattr(player, cmd)
         method()
-
-    # playing list
+    # other functions
     elif cmd == 'playing':
         player.playing(0, args.maxitems)
     elif cmd == 'setcurrent':
-        try:
-            val = args.args[0]
-            if args.trim_id:
-                val = val[:IDWIDTH].strip()
-            curr = int(val)
-        except:
-            return  # do nothing if a new current item isn't specified
-        player.setcurrent(curr)
+        command_setcurrent(player, args)
     elif cmd == 'playinginfo':
-        try:
-            item = int(args.args[0])
-        except:
-            return  # do nothing if a playlist item isn't specified
-        player.playinginfo(item)
-
-    # search
+        command_playinginfo(player, args)
     elif cmd == 'search':
-        if len(args.args) < 1:
-            raise ArgumentError('no search type specified [artists|albums|tracks]')
-        searchtype = args.args[0].lower()
-        if searchtype not in ['artists','albums','tracks']:
-            raise ArgumentError(f'{searchtype} is not a valid search type [artists|albums|tracks]')
-        term = args.args[1] if len(args.args) > 1 else None
-        param = None
-        if term and args.param_search:
-            paramkeys = ('artist_id','album_id','track_id')
-            parts = term.split(':',1)
-            if len(parts) < 2:
-                raise ArgumentError('Not a valid search expression:', term)
-            param = parts[0].lower()
-            term = parts[1]
-            if param not in paramkeys:
-                raise ArgumentError(f'{param} is not a valid search parameter [{",".join(paramkeys)}]')
-        method = getattr(player, 'search_'+searchtype)
-        method(term, param=param, maxitems=args.maxitems)
-
-    # enqueue
+        command_search(player, args)
     elif cmd == 'enqueue':
-        if len(args.args) < 1:
-            raise ArgumentError('no enqueue item type specified [artists|albums|tracks]')
-        itype = args.args[0].lower()
-        items = args.args[1:]
-        if itype not in ['artists','albums','tracks']:
-            raise ArgumentError(f'{itype} is not a valid item type [artists|albums|tracks]')
-        if not items: return
-        method = getattr(player, 'enqueue_'+itype)
-        method(items, args.enqueue_method)
-
-    # info
+        command_enqueue(player, args)
     elif cmd == 'info':
-        if len(args.args) < 1:
-            raise ArgumentError('no info type specified [artists|albums|tracks]')
-        itype = args.args[0].lower()
-        if len(args.args) < 2: return
-        itemid = args.args[1]
-        if args.trim_id:
-            itemid = itemid[:IDWIDTH].strip()
-        if itype not in ['artists','albums','tracks']:
-            raise ArgumentError(f'{itype} is not a valid item type [artist|album|track]')
-        if not itemid: return
-        method = getattr(player, 'info_'+itype)
-        method(itemid)
+        command_info(player, args)
     else:
         # invalid command
-        raise ArgumentError(f"invalid command '{cmd}'")
+        raise LMSArgumentError(f"invalid command '{cmd}'")
+
+
+def execute_command(player, args):
+    # status header
+    if args.status_header:
+        print_status(player, not args.zero_indexing)
+    if args.command is not None:
+        dispatch_command(player, args)
+    # exit player status
+    if args.status:
+        print_status(player, not args.zero_indexing)
 
 
 def main():
@@ -423,7 +471,7 @@ COMMAND:
   stop
   next
   prev
-  powerron
+  poweron
   poweroff
   vup
   vdown
@@ -489,17 +537,10 @@ ENVIRONMENT VARIABLES:
         player.trim_id = True
     if args.zero_indexing:
         player.natural_indexing = False
-    # status header
-    if args.status_header:
-        print_status(player, not args.zero_indexing)
-    if args.command is not None:
-        try:
-            dispatch_command(player, args)
-        except ArgumentError as err:
-            parser.error(str(err))
-    # exit player status
-    if args.status:
-        print_status(player, not args.zero_indexing)
+    try:
+        execute_command(player, args)
+    except LMSError as err:
+        parser.error(str(err))
 
 
 if __name__ == '__main__':
