@@ -406,15 +406,11 @@ def dispatch_command(player, args):
     playercmds = ['status','play','pause','stop','next','prev','poweron','poweroff','vup','vdown','volume']
     cmd = args.command.lower()
     if cmd not in playercmds:
-        # look for a unique command prefix match
-        match = None
-        for cand in playercmds:
-            if cand.startswith(cmd):
-                if match is not None:
-                    raise LMSArgumentError(f"command prefix is not unique '{cmd}'")
-                match = cand
-        if match is not None:
-            cmd = match
+        matches = [m for m in playercmds if m.startswith(cmd)]
+        if len(matches) == 1:
+            cmd = matches[0]
+        elif len(matches) > 1:
+            raise LMSArgumentError(f"command prefix '{cmd}' is not unique. could be {matches}")
     # special case player commands
     if cmd == 'status':
         print_status(player)
