@@ -77,7 +77,7 @@ class Player(object):
         req = urllib.request.Request(self._url)
         req.add_header('Content-Type', 'application/json')
 
-        if type(params) == str:
+        if type(params) is str:
             params = params.split()
         cmd = [player, params]
         data = {'method': 'slim.request',
@@ -387,7 +387,6 @@ def command_enqueue(player, args):
 
 
 def command_info(player, args):
-    print(len(args.args), args.args)
     if len(args.args) < 1:
         raise LMSArgumentError('no info type specified [artists|albums|tracks]')
     if len(args.args) < 2:
