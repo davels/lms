@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 #
 # lms - a simple script to interact with the Lyrion Music Server
 #
