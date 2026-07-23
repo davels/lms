@@ -18,7 +18,6 @@ Specify the server and player using environment variables:
 ``` shell
 export LMS_DEFAULT_HOST=server_host
 export LMS_DEFAULT_PLAYER=player_name
-
 ```
 
 Or via the command line:
@@ -40,12 +39,14 @@ There are basic commands
 
 Commands for searching the music database `search [artists|albums|tracks]`
 ``` shell
-> lms search artists decemb
+> lms search artists de
+   5544  Deftones
+   5543  Def Leppard
 ```
 
 And commands for adding tracks to the current playlist, based on ids returned from search, `enqueue`
 ``` shell
-> lms enqueue artists 5999
+> lms enqueue artists 5544
 ```
 
 See help for full details.
