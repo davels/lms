@@ -35,7 +35,7 @@ class LMSArgumentError(LMSError):
 def _safeint(strval):
     try:
         return int(strval)
-    except:
+    except ValueError,TypeError:
         return -1
 
 def _format_duration(time):
