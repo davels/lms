@@ -410,7 +410,8 @@ def dispatch_command(player, args):
         if len(matches) == 1:
             cmd = matches[0]
         elif len(matches) > 1:
-            raise LMSArgumentError(f"command prefix '{cmd}' is not unique. could be {matches}")
+            mstr = "[" + ", ".join(matches) + "]"
+            raise LMSArgumentError(f"command prefix '{cmd}' is not unique. could be {mstr}")
     # special case player commands
     if cmd == 'status':
         print_status(player)
