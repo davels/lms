@@ -56,6 +56,20 @@ lms_nowplaying () {
         playerargs="$playerargs -n$LMS_PLAYER"
     fi
 
+    LMS_NOWPLAYING_HELP=$(cat <<'EOF'
+       Keybindings
+       -----------
+Enter       : set current track and exit
+Alt-x       : toggle pause
+Alt-s       : stop
+Alt-k       : play prev track
+Alt-j       : play next track
+Ctrl-Space  : set current track
+Ctrl-r      : reload track list
+Ctrl-h      : show this help
+EOF
+)
+    
     # NOTE: -S headerline counts as first entry for {n} so retuned index will be 1..n in
     # the playlist not 0..n-1    
     lms $playerargs -s setcurrent  \
@@ -67,7 +81,8 @@ lms_nowplaying () {
 		  --bind "alt-k:execute-silent(lms $playerargs prev)+reload(lms $playerargs -S playing)"  \
 		  --bind "alt-j:execute-silent(lms $playerargs next)+reload(lms $playerargs -S playing)"  \
 		  --bind "ctrl-space:execute-silent(lms $playerargs -S setcurrent {1})+reload(lms $playerargs -S playing)"  \
-		  --bind "ctrl-r:reload(lms $playerargs -S playing)"
+		  --bind "ctrl-r:reload(lms $playerargs -S playing)" \
+          --bind "ctrl-h:preview(echo \"$LMS_NOWPLAYING_HELP\")"
 	)
 }
 
@@ -79,6 +94,23 @@ lms_search_and_enqueue() { # [$opts...] $search_type $terms...
     if [[ -n $LMS_PLAYER ]]; then
         playerargs="$playerargs -n$LMS_PLAYER"
     fi
+
+    LMS_SEARCHENQUEUE_HELP=$(cat <<'EOF'
+       Keybindings
+       -----------
+Enter       : drill-down on selection
+Alt-a       : add selection to end of playlist
+Alt-t       : add selection next in playlist
+Alt-p       : replace playlist with selection
+Alt-l       : show playlist
+Alt-x       : toggle pause
+Alt-s       : stop
+Alt-k       : play prev track
+Alt-j       : play next track
+Ctrl-h      : show this help
+EOF
+)
+    
     export -f lms_search_and_enqueue
     local searchargs
     while [[ "$1" == -* ]]; do
@@ -111,7 +143,8 @@ lms_search_and_enqueue() { # [$opts...] $search_type $terms...
 	    --bind "alt-s:execute-silent(lms $playerargs stop)"  \
 	    --bind "alt-k:execute-silent(lms $playerargs prev)"  \
 	    --bind "alt-j:execute-silent(lms $playerargs next)"  \
-        --bind "enter:$action"
+        --bind "enter:$action" \
+        --bind "ctrl-h:preview(echo \"$LMS_SEARCHENQUEUE_HELP\")"        
 }
 
 alias fm='lms_status'
