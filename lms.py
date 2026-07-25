@@ -25,6 +25,7 @@ import sys, os
 import urllib.request, urllib.error
 import json
 import argparse
+from typing import NamedTuple
 
 # ensure proper handling of utf8 tags
 sys.stdout.reconfigure(encoding="utf-8")
@@ -58,43 +59,29 @@ def _format_duration(time):
     return '{}:{:02}'.format(int(minutes),int(seconds))
 
 
-class Player(object):
-    def __init__(self, name, host="localhost", port="9000"):
+class PlayerInfo(NamedTuple):
+    name: str
+    playerid: str
+    model: str
+    isplaying: bool
+
+
+class Server(object):
+    """Query the Lyrion Music Server."""
+    def __init__(self, host="localhost", port="9000"):
         self.host = host
         self.port = port
-        self.name = name
-        self.trim_id = False
-        self.natural_indexing = True
-        self._mac = None
         self._url = f'http://{self.host}:{self.port}/jsonrpc.js'
-        self.find_player()
 
-    def __repr__(self):
-        return f'LMS Player: {self.name} ({self._mac})'
-
-    def __bool__(self):
-        return self._mac is not None
-
-    def find_player(self):
-        try:
-            lname = self.name.lower()
-            count = self.request(params='player count ?')['_count']
-            for pinfo in self.request(params=f'players 0 {count}')['players_loop']:
-                if pinfo['name'].lower() == lname:
-                    self._mac = pinfo['playerid']
-                    return True
-        except LMSConnectionError as err:
-            print("LMS error locating player:", err, file=sys.stderr)
-        print("LMS player not found:", self.name, file=sys.stderr)
-        return False
-
-    def request(self, player="-", params=None):
+    def request(self, playerid="-", params=None):
+        """Send a request to the server and return the results.
+        params is a list of strings or a single string with params separated by spaces.
+        """
         req = urllib.request.Request(self._url)
         req.add_header('Content-Type', 'application/json')
-
         if type(params) is str:
             params = params.split()
-        cmd = [player, params]
+        cmd = [playerid, params]
         data = {'method': 'slim.request',
                 'params': cmd}
         try:
@@ -105,9 +92,47 @@ class Player(object):
         except Exception as err:
             raise LMSConnectionError(f'Unkown server error: {err}') from err
 
+    def enumerate_players(self):
+        """Return a list of details for all players known to the server."""
+        resp = self.request(params=f'players 0 999')
+        if 'players_loop' not in resp:
+            return []
+        return [
+            PlayerInfo(
+                name=p["name"],
+                playerid=p["playerid"],
+                model=p["model"],
+                isplaying=bool(p["isplaying"]),
+            )
+            for p in resp["players_loop"]
+        ]
+
+    def find_player(self, name):
+        lname = name.lower()
+        for p in self.enumerate_players():
+            if p.name.lower() == lname:
+                return Player(self, name, p.playerid)
+        return None
+
+
+class Player(object):
+    """Send commands to a specific LMS player."""
+    def __init__(self, server, name, playerid):
+        self.server = server
+        self.name = name
+        self.playerid = playerid
+        self.trim_id = False
+        self.natural_indexing = True
+
+    def __repr__(self):
+        return f'LMS Player: {self.name} ({self.playerid})'
+
+    def __bool__(self):
+        return self.playerid is not None
+
     def player_request(self, command, key=None):
         try:
-            res = self.request(self._mac, command)
+            res = self.server.request(self.playerid, command)
             if key:
                 return res[key]
             return res
@@ -543,7 +568,11 @@ ENVIRONMENT VARIABLES:
         parser.exit(0)
     args = parser.parse_args()
 
-    player = Player(args.player, args.host, args.port)
+    server = Server(args.host, args.port)
+    player = server.find_player(args.player)
+    if not player:
+        print("LMS player not found:", args.player, file=sys.stderr)
+        sys.exit(1)
     if args.trim_id:
         player.trim_id = True
     if args.zero_indexing:

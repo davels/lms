@@ -76,22 +76,23 @@ class TestFormatDuration(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Helper for constructing a Player without hitting the network
+# Helper for constructing a Servers and Players without hitting the network
 # ---------------------------------------------------------------------------
+
+def make_server():
+    return lms.Server(host="testhost", port="9000")
 
 def make_player(mac="00:11:22:33:44:55"):
     """Build a Player instance while skipping the real find_player() lookup."""
-    with patch.object(lms.Player, "find_player", autospec=True, return_value=True):
-        player = lms.Player("Kitchen", host="testhost", port="9000")
-    player._mac = mac
+    player = lms.Player(make_server(), "Kitchen", mac)
     return player
 
 
 # ---------------------------------------------------------------------------
-# Player.request() - the low-level JSON-RPC transport
+# Server.request() - the low-level JSON-RPC transport
 # ---------------------------------------------------------------------------
 
-class TestPlayerRequest(unittest.TestCase):
+class TestServerRequest(unittest.TestCase):
     @staticmethod
     def _mock_response(result):
         payload = json.dumps({"result": result}).encode("utf-8")
@@ -102,22 +103,22 @@ class TestPlayerRequest(unittest.TestCase):
     @patch("lms.urllib.request.urlopen")
     def test_request_returns_result_field(self, mock_urlopen):
         mock_urlopen.return_value = self._mock_response({"_volume": 42})
-        player = make_player()
-        result = player.request(params="mixer volume ?")
+        server = make_server()
+        result = server.request(params="mixer volume ?")
         self.assertEqual(result, {"_volume": 42})
 
     @patch("lms.urllib.request.urlopen")
     def test_connection_failure_raises_lms_connection_error(self, mock_urlopen):
         mock_urlopen.side_effect = lms.urllib.error.URLError("connection refused")
-        player = make_player()
+        server = make_server()
         with self.assertRaises(lms.LMSConnectionError):
-            player.request(params="status")
+            server.request(params="status")
 
     @patch("lms.urllib.request.urlopen")
     def test_string_params_are_split_into_a_list(self, mock_urlopen):
         mock_urlopen.return_value = self._mock_response({"ok": True})
-        player = make_player()
-        player.request(params="mixer volume ?")
+        server = make_server()
+        server.request(params="mixer volume ?")
         sent_body = mock_urlopen.call_args[0][1]
         sent_data = json.loads(sent_body.decode("utf-8"))
         self.assertEqual(sent_data["params"][1], ["mixer", "volume", "?"])
@@ -128,10 +129,10 @@ class TestPlayerRequest(unittest.TestCase):
         mock_resp.read.return_value = b"{"
         mock_urlopen.return_value = mock_resp
 
-        player = make_player()
-
+        server = make_server()
+        
         with self.assertRaises(lms.LMSConnectionError):
-            player.request(params="status")
+            server.request(params="status")
 
     @patch("lms.urllib.request.urlopen")
     def test_missing_result_field_raises_lms_connection_error(self, mock_urlopen):
@@ -139,17 +140,17 @@ class TestPlayerRequest(unittest.TestCase):
         mock_resp.read.return_value = b"{}"
         mock_urlopen.return_value = mock_resp
 
-        player = make_player()
+        server = make_server()
 
         with self.assertRaises(lms.LMSConnectionError):
-            player.request(params="status")
+            server.request(params="status")
 
     @patch("lms.urllib.request.urlopen")
     def test_request_payload_contains_expected_method_and_player(self, mock_urlopen):
         mock_urlopen.return_value = self._mock_response({"ok": True})
-        player = make_player()
+        server = make_server()
 
-        player.request(params="status")
+        server.request(params="status")
 
         sent_body = mock_urlopen.call_args[0][1]
         sent_data = json.loads(sent_body.decode("utf-8"))
