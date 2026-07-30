@@ -347,25 +347,23 @@ class TestDispatchCommand(unittest.TestCase):
         with self.assertRaises(lms.LMSArgumentError):
             lms.command_enqueue(self.player, self._args("enqueue", ["tracks"]))
 
-    def test_param_search_without_colon_raises(self):
+    def test_match_param_without_colon_raises(self):
         with self.assertRaises(lms.LMSArgumentError):
-            lms.command_search(
+            lms.command_match(
                 self.player,
                 self._args(
-                    "search",
-                    ["artists", "123"],
-                    param_search=True,
+                    "match",
+                    ["artists", "123"]
                 ),
             )
 
-    def test_invalid_param_search_key_raises(self):
+    def test_invalid_match_param_key_raises(self):
         with self.assertRaises(lms.LMSArgumentError):
-            lms.command_search(
+            lms.command_match(
                 self.player,
                 self._args(
-                    "search",
-                    ["artists", "foo:1"],
-                    param_search=True,
+                    "match",
+                    ["artists", "foo:1"]
                 ),
             )
 

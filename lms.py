@@ -259,21 +259,42 @@ class Player(object):
             search = ''
         return search
 
-    def search_artists(self, term, param=None, maxitems=9999):
+    def search_artists(self, term, maxitems=9999):
+        search = self._build_search(term, None)
+        res = self.player_request(f'artists 0 {maxitems} {search}')
+        if res['count'] == 0: return
+        for artist in res['artists_loop']:
+            print(f'{artist["id"]:{IDWIDTH}}  {artist["artist"]}')
+
+    def search_albums(self, term, maxitems=9999):
+        search = self._build_search(term, None)
+        res = self.player_request(f'albums 0 {maxitems} tags:a,y,l {search}')
+        if res['count'] == 0: return
+        for album in res['albums_loop']:
+            print(f'{album["id"]:{IDWIDTH}}  {album["album"]} ({album["year"]})  -  {album["artist"]}')
+
+    def search_tracks(self, term, maxitems=9999):
+        search = self._build_search(term, None)
+        res = self.player_request(f'tracks 0 {maxitems} tags:a,l {search}')
+        if res['count'] == 0: return
+        for track in res['titles_loop']:
+            print(f'{track["id"]:{IDWIDTH}}  {track["title"]}  -  {track["album"]}  -  {track["artist"]}')
+
+    def match_artists(self, term, param, maxitems=9999):
         search = self._build_search(term, param)
         res = self.player_request(f'artists 0 {maxitems} {search}')
         if res['count'] == 0: return
         for artist in res['artists_loop']:
             print(f'{artist["id"]:{IDWIDTH}}  {artist["artist"]}')
 
-    def search_albums(self, term, param=None, maxitems=9999):
+    def match_albums(self, term, param, maxitems=9999):
         search = self._build_search(term, param)
         res = self.player_request(f'albums 0 {maxitems} tags:a,y,l {search}')
         if res['count'] == 0: return
         for album in res['albums_loop']:
             print(f'{album["id"]:{IDWIDTH}}  {album["album"]} ({album["year"]})  -  {album["artist"]}')
 
-    def search_tracks(self, term, param=None, maxitems=9999):
+    def match_tracks(self, term, param, maxitems=9999):
         search = self._build_search(term, param)
         res = self.player_request(f'tracks 0 {maxitems} tags:a,l {search}')
         if res['count'] == 0: return
@@ -398,17 +419,28 @@ def command_search(player, args):
     if searchtype not in ['artists','albums','tracks']:
         raise LMSArgumentError(f'{searchtype} is not a valid search type [artists|albums|tracks]')
     term = args.args[1] if len(args.args) > 1 else None
+    method = getattr(player, 'search_'+searchtype)
+    method(term, maxitems=args.maxitems)
+
+
+def command_match(player, args):
+    if len(args.args) < 1:
+        raise LMSArgumentError('no match type specified [artists|albums|tracks]')
+    searchtype = args.args[0].lower()
+    if searchtype not in ['artists','albums','tracks']:
+        raise LMSArgumentError(f'{searchtype} is not a valid match type [artists|albums|tracks]')
+    term = args.args[1] if len(args.args) > 1 else None
     param = None
-    if term and args.param_search:
+    if term:
         paramkeys = ('artist_id','album_id','track_id')
         parts = term.split(':',1)
         if len(parts) < 2:
-            raise LMSArgumentError(f'Not a valid search expression: {term}')
+            raise LMSArgumentError(f'Not a valid match expression: {term}')
         param = parts[0].lower()
         term = parts[1]
         if param not in paramkeys:
-            raise LMSArgumentError(f'{param} is not a valid search parameter [{",".join(paramkeys)}]')
-    method = getattr(player, 'search_'+searchtype)
+            raise LMSArgumentError(f'{param} is not a valid match parameter [{",".join(paramkeys)}]')
+    method = getattr(player, 'match_'+searchtype)
     method(term, param=param, maxitems=args.maxitems)
 
 
@@ -478,6 +510,8 @@ def dispatch_command(player, args):
         command_playinginfo(player, args)
     elif cmd == 'search':
         command_search(player, args)
+    elif cmd == 'match':
+        command_match(player, args)
     elif cmd == 'enqueue':
         command_enqueue(player, args)
     elif cmd == 'info':
@@ -516,10 +550,11 @@ COMMAND:
   setcurrent <n>
   playinginfo <n>
   search [artists|albums|tracks] TERM
+  match [artists|albums|tracks] ITEMS
   enqueue [artists|albums|tracks] ITEMS
   info [artists|albums|tracks] ITEM
 
-  NOTE: ITEM for enqueue and info commands is the database id, as returned from search.
+  NOTE: ITEM for match, enqueue,  and info commands is the database id, as returned from search.
 
 PARAMETER SEARCH
   The --param-search option changes the search method from text match to a parameter
@@ -554,8 +589,6 @@ ENVIRONMENT VARIABLES:
                         help='print a one line status for the player at the start of execution')
     parser.add_argument('-m','--search-max', type=int, default=9999, dest='maxitems',
                         help='maximum number of search results (default: %(default)s)')
-    parser.add_argument('-r','--param-search', action='store_true',
-                        help='search term is a key:value search parameter')
     parser.add_argument('-e','--enqueue-method', default='add',
                         choices=['play','insert','add'],
                         help='method used to enqueue tracks for the enqueue command (default: add)')
