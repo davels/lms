@@ -153,7 +153,7 @@ EOF
 	    --bind "alt-a:execute-silent(lms $playerargs -e add enqueue $stype {+1})+preview:echo -e \"Adding to playlist...\n{+2..}\""  \
 	    --bind "alt-t:execute-silent(lms $playerargs -e insert enqueue $stype {+1})+preview:echo -e \"Inserting into playlist...\n{+2..}\""  \
 	    --bind "alt-p:execute-silent(lms $playerargs -e play enqueue $stype {+1})+preview:echo -e \"Playing...\n{+2..}\""  \
-        --bind "alt-l:execute(echo '' && lms $playerargs -s playing && read -p '  <Press Enter to continue>' </dev/tty)"  \
+        --bind "alt-l:preview(lms $playerargs playing)"  \
 	    --bind "alt-x:execute-silent(lms $playerargs pause)"  \
 	    --bind "alt-s:execute-silent(lms $playerargs stop)"  \
 	    --bind "alt-k:execute-silent(lms $playerargs prev)"  \
