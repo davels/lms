@@ -66,7 +66,7 @@ class PlayerInfo(NamedTuple):
     isplaying: bool
 
 
-class Server(object):
+class Server:
     """Query the Lyrion Music Server."""
     def __init__(self, host="localhost", port="9000"):
         self.host = host
@@ -94,7 +94,7 @@ class Server(object):
 
     def enumerate_players(self):
         """Return a list of details for all players known to the server."""
-        resp = self.request(params=f'players 0 999')
+        resp = self.request(params='players 0 999')
         if 'players_loop' not in resp:
             return []
         return [
@@ -115,7 +115,7 @@ class Server(object):
         return None
 
 
-class Player(object):
+class Player:
     """Send commands to a specific LMS player."""
     def __init__(self, server, name, playerid):
         self.server = server
