@@ -11,7 +11,7 @@
 #
 # lms_nowplaying - show the current playlist
 #    Select      : set current track
-#    Alt-x       : pause
+#    Alt-x       : toggle pause
 #    Alt-s       : stop
 #    Alt-k       : prev track
 #    Alt-j       : next track
@@ -24,7 +24,7 @@
 #    Alt-t       : insert selected/marked tracks into playlist after current track
 #    Alt-p       : play selected/marked tracks
 #    Alt-l       : view current playlist
-#    Alt-x       : pause
+#    Alt-x       : toggle pause
 #    Alt-s       : stop
 #    Alt-k       : play prev track
 #    Alt-j       : play next track
@@ -34,27 +34,15 @@
 # option not supported on older fzf versions (ubuntu 20.04)
 export _LMS_EXTRA_ARGS=$(if [ `fzf --version | ( IFS=". " ; read major minor rest && echo $minor)` -ge 28 ]; then echo "--header-first"; fi)
 
-lms_status ()
+lms_status ()  # [$playerargs]
 {
-    local playerargs
-    if [[ -n $LMS_HOST ]]; then
-        playerargs="$playerargs -a$LMS_HOST"
-    fi
-    if [[ -n $LMS_PLAYER ]]; then
-        playerargs="$playerargs -n$LMS_PLAYER"
-    fi
-
-    lms $playerargs -s
+    local -a playerargs=("$@")
+    lms ${playerargs[@]} -s
 }
 
-lms_nowplaying () {
-    local playerargs
-    if [[ -n $LMS_HOST ]]; then
-        playerargs="$playerargs -a$LMS_HOST"
-    fi
-    if [[ -n $LMS_PLAYER ]]; then
-        playerargs="$playerargs -n$LMS_PLAYER"
-    fi
+lms_nowplaying ()  # [$playerargs]
+{
+    local -a playerargs=("$@")
 
     LMS_NOWPLAYING_HELP=$(cat <<'EOF'
        Keybindings
@@ -70,31 +58,24 @@ Ctrl-h      : show this help
 EOF
 )
     
-    # NOTE: -S headerline counts as first entry for {n} so retuned index will be 1..n in
-    # the playlist not 0..n-1    
-    lms $playerargs -s setcurrent  \
-	$(lms $playerargs -S playing | \
-	      fzf --tac --header-lines=1 $_LMS_EXTRA_ARGS  \
-		  --preview "lms $playerargs playinginfo {n}"  \
-		  --bind "alt-x:execute-silent(lms $playerargs pause)+reload(lms $playerargs -S playing)"  \
-		  --bind "alt-s:execute-silent(lms $playerargs stop)+reload(lms $playerargs -S playing)"  \
-		  --bind "alt-k:execute-silent(lms $playerargs prev)+reload(lms $playerargs -S playing)"  \
-		  --bind "alt-j:execute-silent(lms $playerargs next)+reload(lms $playerargs -S playing)"  \
-		  --bind "ctrl-space:execute-silent(lms $playerargs -S setcurrent {1})+reload(lms $playerargs -S playing)"  \
-		  --bind "ctrl-r:reload(lms $playerargs -S playing)" \
+    # NOTE: -S headerline counts as first entry for {n} so returned index will be 1..n in
+    # the playlist not 0..n-1
+    lms ${playerargs[@]} -s setcurrent  \
+	$(lms ${playerargs[@]} -S playing | \
+          fzf --tac --header-lines=1 $_LMS_EXTRA_ARGS  \
+		  --preview "lms ${playerargs[*]} playinginfo {n}"  \
+		  --bind "alt-x:execute-silent(lms ${playerargs[*]} pause)+reload(lms ${playerargs[*]} -S playing)"  \
+		  --bind "alt-s:execute-silent(lms ${playerargs[*]} stop)+reload(lms ${playerargs[*]} -S playing)"  \
+		  --bind "alt-k:execute-silent(lms ${playerargs[*]} prev)+reload(lms ${playerargs[*]} -S playing)"  \
+		  --bind "alt-j:execute-silent(lms ${playerargs[*]} next)+reload(lms ${playerargs[*]} -S playing)"  \
+		  --bind "ctrl-space:execute-silent(lms ${playerargs[*]} -S setcurrent {1})+reload(lms ${playerargs[*]} -S playing)"  \
+		  --bind "ctrl-r:reload(lms ${playerargs[*]} -S playing)" \
           --bind "ctrl-h:preview(echo \"$LMS_NOWPLAYING_HELP\")"
 	)
 }
 
-lms_search_and_enqueue() { # [$opts...] $search_type $terms...
-    local playerargs
-    if [[ -n $LMS_HOST ]]; then
-        playerargs="$playerargs -a$LMS_HOST"
-    fi
-    if [[ -n $LMS_PLAYER ]]; then
-        playerargs="$playerargs -n$LMS_PLAYER"
-    fi
-
+lms_search_and_enqueue()  # [$opts...] $search_type $terms...
+{
     LMS_SEARCHENQUEUE_HELP=$(cat <<'EOF'
        Keybindings
        -----------
@@ -110,61 +91,69 @@ Alt-j       : play next track
 Ctrl-h      : show this help
 EOF
 )
-    
+    local command="search"
+    local stype=""
+    local -a playerargs=()
+    local -a searchargs=()
     export -f lms_search_and_enqueue
-    local searchargs
-    # command starts as 'search' (text searching), fzf drilldown actions use 'match'
-    # because they use matches against the selected id.
-    local command=search
-    while [[ "$1" == -* ]]; do
+
+    while (($#)); do
         case "$1" in
             -drilldown)
-                command=match
+                command="match"
+                ;;
+            artists|albums|tracks)
+                stype=$1
+                shift
+                searchargs=("$@")
+                break
                 ;;
             *)
-            searchargs="$1 $searchargs"
-            ;;
+                playerargs+=("$1")
+                ;;
         esac
         shift
     done
-    if [[ $# -eq 0 ]]; then
-        echo "lms_search_and_enqueue: missing search type (artists|albums|tracks)" >&2
+
+    if [[ -z $stype ]]; then
+        printf 'Usage: %s [player options] [-drilldown] {artists|albums|tracks} [search terms...]\n' \
+               "${FUNCNAME[0]}" >&2
         return 1
     fi
-    
-    local stype=$1
+   
     local action
     case $stype in
-	 artists )
+     artists )
          action="execute:(lms_search_and_enqueue -drilldown albums artist_id:{1})"
-	     ;;
-	 albums )
-	     action="execute:(lms_search_and_enqueue -drilldown tracks album_id:{1})"
-	     ;;
-	 * )
-	     action="execute-silent:(ignore)"
+         ;;
+     albums )
+         action="execute:(lms_search_and_enqueue -drilldown tracks album_id:{1})"
+         ;;
+     * )
+         action="execute-silent:(ignore)"
     esac
     
-    lms $playerargs $searchargs "$command" $stype "${@:2}"  \
-	|  \
-	fzf --tac -m --with-nth="2.." --no-hscroll  \
-	    --prompt="$stype> "  \
-	    --preview="lms $playerargs info $stype {1}"  \
-	    --bind "alt-a:execute-silent(lms $playerargs -e add enqueue $stype {+1})+preview:echo -e \"Adding to playlist...\n{+2..}\""  \
-	    --bind "alt-t:execute-silent(lms $playerargs -e insert enqueue $stype {+1})+preview:echo -e \"Inserting into playlist...\n{+2..}\""  \
-	    --bind "alt-p:execute-silent(lms $playerargs -e play enqueue $stype {+1})+preview:echo -e \"Playing...\n{+2..}\""  \
-        --bind "alt-l:preview(lms $playerargs playing)"  \
-	    --bind "alt-x:execute-silent(lms $playerargs pause)"  \
-	    --bind "alt-s:execute-silent(lms $playerargs stop)"  \
-	    --bind "alt-k:execute-silent(lms $playerargs prev)"  \
-	    --bind "alt-j:execute-silent(lms $playerargs next)"  \
+    lms ${playerargs[@]} $searchargs "$command" $stype "${@:2}"  \
+    |  \
+    fzf --tac -m --with-nth="2.." --no-hscroll  \
+        --prompt="$stype> "  \
+        --preview="lms ${playerargs[*]} info $stype {1}"  \
+        --bind "alt-a:execute-silent(lms ${playerargs[*]} -e add enqueue $stype {+1})+preview:echo -e \"Adding to playlist...\n{+2..}\""  \
+        --bind "alt-t:execute-silent(lms ${playerargs[*]} -e insert enqueue $stype {+1})+preview:echo -e \"Inserting into playlist...\n{+2..}\""  \
+        --bind "alt-p:execute-silent(lms ${playerargs[*]} -e play enqueue $stype {+1})+preview:echo -e \"Playing...\n{+2..}\""  \
+        --bind "alt-l:preview(lms ${playerargs[*]} playing)"  \
+        --bind "alt-x:execute-silent(lms ${playerargs[*]} pause)"  \
+        --bind "alt-s:execute-silent(lms ${playerargs[*]} stop)"  \
+        --bind "alt-k:execute-silent(lms ${playerargs[*]} prev)"  \
+        --bind "alt-j:execute-silent(lms ${playerargs[*]} next)"  \
         --bind "enter:$action" \
-        --bind "ctrl-h:preview(echo \"$LMS_SEARCHENQUEUE_HELP\")"        
+        --bind "ctrl-h:preview(echo \"$LMS_SEARCHENQUEUE_HELP\")"
 }
 
 alias fm='lms_status'
 alias ff='lms_nowplaying'
-alias fb='lms_search_and_enqueue albums'
-alias fa='lms_search_and_enqueue artists'
-alias ft='lms_search_and_enqueue tracks'
+fb() { lms_search_and_enqueue "$@" albums; }
+fa() { lms_search_and_enqueue "$@" artists; }
+ft() { lms_search_and_enqueue "$@" tracks; }
+
 
