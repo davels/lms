@@ -76,14 +76,13 @@ class Server:
         self.port = port
         self._url = f'http://{self.host}:{self.port}/jsonrpc.js'
 
-    def request(self, playerid="-", params=None):
-        """Send a request to the server and return the results.
-        params is a list of strings or a single string with params separated by spaces.
-        """
+    def __repr__(self):
+        return f'LMS Server: {self.host}:{self.port}'
+
+    def request(self, playerid, *params):
+        """Send a request to the server and return the results."""
         req = urllib.request.Request(self._url)
         req.add_header('Content-Type', 'application/json')
-        if type(params) is str:
-            params = params.split()
         cmd = [playerid, params]
         data = {'method': 'slim.request',
                 'params': cmd}
@@ -95,9 +94,13 @@ class Server:
         except Exception as err:
             raise LMSConnectionError(f'Unkown server error: {err}') from err
 
+    def global_request(self, *params):
+        """Send a server request not tied to a player."""
+        return self.request(0, *params)  # 0 is the 'none' player
+
     def enumerate_players(self) -> list[PlayerInfo]:
         """Return a list of details for all players known to the server."""
-        resp = self.request(params='players 0 999')
+        resp = self.global_request('players', 0, 999)
         if 'players_loop' not in resp:
             return []
         return [
@@ -111,6 +114,7 @@ class Server:
         ]
 
     def find_player(self, name):
+        """Return the PlayerInfo with the matching name."""
         lname = name.lower()
         for p in self.enumerate_players():
             if p.name.lower() == lname:
@@ -119,7 +123,7 @@ class Server:
 
 
 class Player:
-    """Send commands to a specific LMS player."""
+    """Send commands for a specific LMS player."""
     def __init__(self, server: Server, name='', playerid=None):
         self.server = server
         self.name = name
@@ -133,28 +137,31 @@ class Player:
     def __bool__(self):
         return self.playerid is not None
 
-    def player_request(self, command, key=None):
+    def player_request(self, command, *params):
+        """Send a server request for this player and return the result dictionary."""
         if self.playerid is None:
             raise LMSNoPlayerError('LMS player not specified')
         try:
-            res = self.server.request(self.playerid, command)
-            if key:
-                return res[key]
-            return res
+            return self.server.request(self.playerid, command, *params)
         except Exception as err:
             raise LMSRequestError(f'LMS player_request "{command}" failed: {err}') from err
 
+    def player_request_result(self, reskey, command, *params):
+        """Send a server request and return the reskey value from the returned dictionary."""
+        res = self.player_request(command, *params)
+        return res[reskey]
+
     def poweron(self):
         """Turn the player on."""
-        return self.player_request('power 1')
+        return self.player_request('power', 1)
 
     def poweroff(self):
         """Turn the player off."""
-        return self.player_request('power 0')
+        return self.player_request('power', 0)
 
     def state(self):
         """Return current playing state: ("play", "pause", "stop")."""
-        return self.player_request('mode ?', '_mode')
+        return self.player_request_result('_mode', 'mode', '?')
 
     def play(self):
         """Start playing the current item."""
@@ -171,48 +178,48 @@ class Player:
         if state is None:
             self.player_request('pause')
         else:
-            self.player_request(f'pause {1 if state else 0}')
+            self.player_request('pause', 1 if state else 0)
 
     def next(self):
         """Play next item in playlist."""
-        self.player_request('playlist index +1')
+        self.player_request('playlist', 'index', '+1')
 
     def prev(self):
         """Play previous item in playlist."""
-        self.player_request('playlist index -1')
+        self.player_request('playlist', 'index', '-1')
 
     def vup(self, step=10):
         """Increase the volume."""
-        return self.player_request(f'mixer volume +{step}')
+        self.player_request('mixer', 'volume', f'+{step}')
 
     def vdown(self, step=10):
         """Decrease the volume."""
-        return self.player_request(f'mixer volume -{step}')
+        self.player_request('mixer', 'volume', f'-{step}')
 
     def volume(self, volume=None):
         """Print or set the volume."""
         if volume is None:
-            print('Volume:', self.player_request('mixer volume ?','_volume'))
+            print('Volume:', self.player_request_result('_volume', 'mixer', 'volume', '?'))
         else:
             if volume < 0: volume = 0
             elif volume > 100: volume = 100
-            self.player_request(f'mixer volume {volume}')
+            self.player_request('mixer', 'volume', volume)
 
     def track_artist(self):
         """Return the artist for the current playlist item."""
-        return self.player_request('artist ?', '_artist')
+        return self.player_request_result('_artist', 'artist', '?')
 
     def track_album(self):
         """Return the album for the current playlist item."""
-        return self.player_request('album ?', '_album')
+        return self.player_request_result('_album', 'album','?')
 
     def track_title(self):
         """Return name of the track for the current playlist item."""
-        return self.player_request('title ?', '_title')
+        return self.player_request_result('_title', 'title', '?')
 
     def playing(self, page=0, pagesize=9999):
         """Print tracks in the current playist."""
-        res = self.player_request(f'status {page*pagesize} {pagesize} tags:a')
+        res = self.player_request('status', page*pagesize, pagesize, 'tags:a')
         if res['playlist_tracks'] == 0: return
         cur = _safeint(res.get('playlist_cur_index', -1))
         for track in res['playlist_loop']:
@@ -224,7 +231,7 @@ class Player:
     def setcurrent(self, plindex):
         """Set the current track in the current playlist."""
         if self.natural_indexing: plindex -= 1
-        self.player_request(f'playlist index {plindex}')
+        self.player_request('playlist', 'index', 'plindex')
 
     def _print_track(self, trackinfo):
         print('Title:   ', trackinfo['title'])
@@ -240,7 +247,7 @@ class Player:
     def playinginfo(self, plindex):
         """Print the details for the track with the specified index in the current playlist."""
         if self.natural_indexing: plindex -= 1
-        res = self.player_request(f'status {plindex} 1 tags:a,d,f,g,i,l,o,q,r,t,y')
+        res = self.player_request('status', 'plindex', 1, 'tags:a,d,f,g,i,l,o,q,r,t,y')
         if 'playlist_loop' not in res:
             return  # plindex provided is not valid
         self._print_track(res['playlist_loop'][0])
@@ -263,42 +270,42 @@ class Player:
 
     def search_artists(self, term, maxitems=9999):
         search = self._build_search(term, None)
-        res = self.player_request(f'artists 0 {maxitems} {search}')
+        res = self.player_request('artists', 0, maxitems, search)
         if res['count'] == 0: return
         for artist in res['artists_loop']:
             print(f'{artist["id"]:{IDWIDTH}}  {artist["artist"]}')
 
     def search_albums(self, term, maxitems=9999):
         search = self._build_search(term, None)
-        res = self.player_request(f'albums 0 {maxitems} tags:a,y,l {search}')
+        res = self.player_request('albums', 0, maxitems, 'tags:a,y,l', search)
         if res['count'] == 0: return
         for album in res['albums_loop']:
             print(f'{album["id"]:{IDWIDTH}}  {album["album"]} ({album["year"]})  -  {album["artist"]}')
 
     def search_tracks(self, term, maxitems=9999):
         search = self._build_search(term, None)
-        res = self.player_request(f'tracks 0 {maxitems} tags:a,l {search}')
+        res = self.player_request('tracks', 0, 'maxitems', 'tags:a,l', search)
         if res['count'] == 0: return
         for track in res['titles_loop']:
             print(f'{track["id"]:{IDWIDTH}}  {track["title"]}  -  {track["album"]}  -  {track["artist"]}')
 
     def match_artists(self, term, param, maxitems=9999):
         search = self._build_search(term, param)
-        res = self.player_request(f'artists 0 {maxitems} {search}')
+        res = self.player_request('artists', 0, maxitems, search)
         if res['count'] == 0: return
         for artist in res['artists_loop']:
             print(f'{artist["id"]:{IDWIDTH}}  {artist["artist"]}')
 
     def match_albums(self, term, param, maxitems=9999):
         search = self._build_search(term, param)
-        res = self.player_request(f'albums 0 {maxitems} tags:a,y,l {search}')
+        res = self.player_request('albums', 0, maxitems, 'tags:a,y,l', search)
         if res['count'] == 0: return
         for album in res['albums_loop']:
             print(f'{album["id"]:{IDWIDTH}}  {album["album"]} ({album["year"]})  -  {album["artist"]}')
 
     def match_tracks(self, term, param, maxitems=9999):
         search = self._build_search(term, param)
-        res = self.player_request(f'tracks 0 {maxitems} tags:a,l {search}')
+        res = self.player_request('tracks', 0, maxitems, 'tags:a,l', search)
         if res['count'] == 0: return
         for track in res['titles_loop']:
             print(f'{track["id"]:{IDWIDTH}}  {track["title"]}  -  {track["album"]}  -  {track["artist"]}')
@@ -317,7 +324,7 @@ class Player:
         # track is special and allows a comma separated list of ids
         if itemtype=='track': items = [','.join(items)]
         for itemid in items:
-            self.player_request(f'playlistcontrol cmd:{method} {itemtype}_id:{itemid}')
+            self.player_request('playlistcontrol', f'cmd:{method}', f'{itemtype}_id:{itemid}')
 
     def enqueue_artists(self, items, method='add'):
         self._enqueue('artist', items, method)
@@ -329,11 +336,11 @@ class Player:
         self._enqueue('track', items, method)
 
     def info_artists(self, artistid):
-        res = self.player_request(f'artists 0 1 artist_id:{artistid}')
+        res = self.player_request('artists', 0, 1, f'artist_id:{artistid}')
         artist = ''
         if 'artists_loop' in res:
             artist = res['artists_loop'][0].get('artist','')
-        res = self.player_request(f'albums 0 9999 tags:a,l,y artist_id:{artistid}')
+        res = self.player_request('albums', 0, 9999, 'tags:a,l,y', f'artist_id:{artistid}')
         if 'albums_loop' not in res:
             return
         albums = res['albums_loop']
@@ -347,7 +354,7 @@ class Player:
             print(f'{album["album"]} ({album.get("year","")}){albumartist}')
 
     def info_albums(self, albumid):
-        res = self.player_request(f'tracks 0 9999 tags:a,l,t,g,y,d album_id:{albumid}')
+        res = self.player_request('tracks', 0, 9999, 'tags:a,l,t,g,y,d', f'album_id:{albumid}')
         if 'titles_loop' not in res:
             return
         tracks = res['titles_loop']
@@ -359,7 +366,7 @@ class Player:
             print(f'  {track.get("tracknum",""):>2}. {track["title"]}  ({dur})')
 
     def info_tracks(self, trackid):
-        res = self.player_request(f'tracks 0 1 tags:a,d,f,g,i,l,o,q,r,t,y track_id:{trackid}')
+        res = self.player_request('tracks', 0, 1, 'tags:a,d,f,g,i,l,o,q,r,t,y', f'track_id:{trackid}')
         if 'titles_loop' not in res:
             return
         self._print_track(res['titles_loop'][0])
@@ -383,7 +390,7 @@ def print_status(player: Player, natural_indexing=True):
             except BaseException as err:
                 raise LMSError(f'Invalid playlist index returned from status: {plindex}') from err
         curtrack = f'{plindex}/{res["playlist_tracks"]}'
-        res = player.player_request(f'status {res["playlist_cur_index"]} 1 tags:a')
+        res = player.player_request('status', f'{res["playlist_cur_index"]}', 1, 'tags:a')
         if 'playlist_loop' in res:
             pl = res['playlist_loop']
             if pl:
@@ -644,3 +651,5 @@ if __name__ == '__main__':
     main()
 
 
+s = Server('han')
+p = s.find_player('office')

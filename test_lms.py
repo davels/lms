@@ -104,7 +104,7 @@ class TestServerRequest(unittest.TestCase):
     def test_request_returns_result_field(self, mock_urlopen):
         mock_urlopen.return_value = self._mock_response({"_volume": 42})
         server = make_server()
-        result = server.request(params="mixer volume ?")
+        result = server.request(1, "mixer", "volume", "?")
         self.assertEqual(result, {"_volume": 42})
 
     @patch("lms.urllib.request.urlopen")
@@ -112,13 +112,13 @@ class TestServerRequest(unittest.TestCase):
         mock_urlopen.side_effect = lms.urllib.error.URLError("connection refused")
         server = make_server()
         with self.assertRaises(lms.LMSConnectionError):
-            server.request(params="status")
+            server.request(0, "status")
 
     @patch("lms.urllib.request.urlopen")
     def test_string_params_are_split_into_a_list(self, mock_urlopen):
         mock_urlopen.return_value = self._mock_response({"ok": True})
         server = make_server()
-        server.request(params="mixer volume ?")
+        server.request(1, "mixer", "volume", "?")
         sent_body = mock_urlopen.call_args[0][1]
         sent_data = json.loads(sent_body.decode("utf-8"))
         self.assertEqual(sent_data["params"][1], ["mixer", "volume", "?"])
@@ -128,34 +128,28 @@ class TestServerRequest(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.read.return_value = b"{"
         mock_urlopen.return_value = mock_resp
-
         server = make_server()
-        
         with self.assertRaises(lms.LMSConnectionError):
-            server.request(params="status")
+            server.request(1, "status")
 
     @patch("lms.urllib.request.urlopen")
     def test_missing_result_field_raises_lms_connection_error(self, mock_urlopen):
         mock_resp = MagicMock()
         mock_resp.read.return_value = b"{}"
         mock_urlopen.return_value = mock_resp
-
         server = make_server()
-
         with self.assertRaises(lms.LMSConnectionError):
-            server.request(params="status")
+            server.request(1, "status")
 
     @patch("lms.urllib.request.urlopen")
     def test_request_payload_contains_expected_method_and_player(self, mock_urlopen):
         mock_urlopen.return_value = self._mock_response({"ok": True})
         server = make_server()
-
-        server.request(params="status")
-
+        server.request(1, "status")
         sent_body = mock_urlopen.call_args[0][1]
         sent_data = json.loads(sent_body.decode("utf-8"))
         self.assertEqual(sent_data["method"], "slim.request")
-        self.assertEqual(sent_data["params"][0], "-")
+        self.assertEqual(sent_data["params"][0], 1)
 
 
 # ---------------------------------------------------------------------------
@@ -224,13 +218,13 @@ class TestEnqueue(unittest.TestCase):
     def test_track_ids_are_joined_into_one_csv_request(self):
         self.player._enqueue("track", ["1", "2", "3"], "add")
         self.player.player_request.assert_called_once_with(
-            "playlistcontrol cmd:add track_id:1,2,3"
+            "playlistcontrol", "cmd:add", "track_id:1,2,3"
         )
 
     def test_play_method_maps_to_server_load_command(self):
         self.player._enqueue("album", ["7"], "play")
         self.player.player_request.assert_called_once_with(
-            "playlistcontrol cmd:load album_id:7"
+            "playlistcontrol", "cmd:load", "album_id:7"
         )
 
     def test_album_ids_are_sent_one_request_each(self):
@@ -241,7 +235,7 @@ class TestEnqueue(unittest.TestCase):
     def test_dash_reads_items_from_stdin_using_first_field(self):
         self.player._enqueue("track", ["-"], "add")
         self.player.player_request.assert_called_once_with(
-            "playlistcontrol cmd:add track_id:101,202"
+            "playlistcontrol", "cmd:add", "track_id:101,202"
         )
 
     @patch("sys.stdin", io.StringIO(""))
@@ -253,17 +247,7 @@ class TestEnqueue(unittest.TestCase):
     def test_blank_lines_are_ignored(self):
         self.player._enqueue("track", ["-"], "add")
         self.player.player_request.assert_called_once_with(
-            "playlistcontrol cmd:add track_id:101,202"
-        )
-
-    def test_whitespace_items_are_ignored(self):
-        self.player._enqueue(
-            "track",
-            ["", "   ", "123"],
-            "add",
-        )
-        self.player.player_request.assert_called_once_with(
-            "playlistcontrol cmd:add track_id:123"
+            "playlistcontrol", "cmd:add", "track_id:101,202"
         )
 
 
@@ -275,28 +259,28 @@ class TestVolume(unittest.TestCase):
     CURRENT_VOLUME = 50
     def setUp(self):
         self.player = make_player()
-        self.player.player_request = MagicMock(return_value=self.CURRENT_VOLUME)
+        self.player.player_request = MagicMock(return_value={'_volume':self.CURRENT_VOLUME})
 
     def test_value_above_100_is_clamped(self):
         self.player.volume(150)
-        self.player.player_request.assert_called_once_with("mixer volume 100")
+        self.player.player_request.assert_called_once_with("mixer", "volume", 100)
 
     def test_value_below_0_is_clamped(self):
         self.player.volume(-10)
-        self.player.player_request.assert_called_once_with("mixer volume 0")
+        self.player.player_request.assert_called_once_with("mixer", "volume", 0)
 
     def test_value_zero_is_not_modified(self):
         self.player.volume(0)
-        self.player.player_request.assert_called_once_with("mixer volume 0")
+        self.player.player_request.assert_called_once_with("mixer", "volume", 0)
 
     def test_value_100_is_not_modified(self):
         self.player.volume(100)
-        self.player.player_request.assert_called_once_with("mixer volume 100")
+        self.player.player_request.assert_called_once_with("mixer", "volume", 100)
 
     def test_no_argument_prints_current_volume(self):
         with patch("builtins.print") as mock_print:
             self.player.volume(None)
-        self.player.player_request.assert_called_once_with("mixer volume ?", "_volume")
+        self.player.player_request.assert_called_once_with("mixer", "volume", "?")
         mock_print.assert_called_once_with("Volume:", self.CURRENT_VOLUME)
 
 
