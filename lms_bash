@@ -60,8 +60,8 @@ EOF
     
     # NOTE: -S headerline counts as first entry for {n} so returned index will be 1..n in
     # the playlist not 0..n-1
-    lms ${playerargs[@]} -s setcurrent  \
-	$(lms ${playerargs[@]} -S playing | \
+    local selection
+    selection=$(lms ${playerargs[@]} -S playing | \
           fzf --tac --header-lines=1 $_LMS_EXTRA_ARGS  \
 		  --preview "lms ${playerargs[*]} playinginfo {n}"  \
 		  --bind "alt-x:execute-silent(lms ${playerargs[*]} pause)+reload(lms ${playerargs[*]} -S playing)"  \
@@ -72,6 +72,9 @@ EOF
 		  --bind "ctrl-r:reload(lms ${playerargs[*]} -S playing)" \
           --bind "ctrl-h:preview(echo \"$LMS_NOWPLAYING_HELP\")"
 	)
+
+    [[ -z $selection ]] && return 0
+    lms ${playerargs[@]} -s setcurrent $selection
 }
 
 lms_search_and_enqueue()  # [$opts...] $search_type $terms...
@@ -124,16 +127,16 @@ EOF
     local action
     case $stype in
      artists )
-         action="execute:(lms_search_and_enqueue -drilldown albums artist_id:{1})"
+         action="execute:(lms_search_and_enqueue -drilldown ${playerargs[*]} albums artist_id:{1})"
          ;;
      albums )
-         action="execute:(lms_search_and_enqueue -drilldown tracks album_id:{1})"
+         action="execute:(lms_search_and_enqueue -drilldown ${playerargs[*]} tracks album_id:{1})"
          ;;
      * )
          action="execute-silent:(ignore)"
     esac
-    
-    lms ${playerargs[@]} $searchargs "$command" $stype "${@:2}"  \
+
+    lms ${playerargs[@]} "$command" $stype $searchargs \
     |  \
     fzf --tac -m --with-nth="2.." --no-hscroll  \
         --prompt="$stype> "  \
