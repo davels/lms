@@ -47,6 +47,9 @@ class LMSRequestError(LMSError):
 class LMSArgumentError(LMSError):
     pass
 
+class LMSNoPlayerError(LMSError):
+    pass
+
 
 def _safeint(strval):
     try:
@@ -92,7 +95,7 @@ class Server:
         except Exception as err:
             raise LMSConnectionError(f'Unkown server error: {err}') from err
 
-    def enumerate_players(self):
+    def enumerate_players(self) -> list[PlayerInfo]:
         """Return a list of details for all players known to the server."""
         resp = self.request(params='players 0 999')
         if 'players_loop' not in resp:
@@ -101,7 +104,7 @@ class Server:
             PlayerInfo(
                 name=p["name"],
                 playerid=p["playerid"],
-                model=p["model"],
+                model=p["modelname"],
                 isplaying=bool(p["isplaying"]),
             )
             for p in resp["players_loop"]
@@ -117,7 +120,7 @@ class Server:
 
 class Player:
     """Send commands to a specific LMS player."""
-    def __init__(self, server, name, playerid):
+    def __init__(self, server: Server, name='', playerid=None):
         self.server = server
         self.name = name
         self.playerid = playerid
@@ -131,6 +134,8 @@ class Player:
         return self.playerid is not None
 
     def player_request(self, command, key=None):
+        if self.playerid is None:
+            raise LMSNoPlayerError('LMS player not specified')
         try:
             res = self.server.request(self.playerid, command)
             if key:
@@ -159,17 +164,14 @@ class Player:
         """Stop the player."""
         self.player_request('stop')
 
-    def pause(self):
-        """Pause the player. This does not unpause the player if already paused."""
-        self.player_request('pause 1')
-
-    def unpause(self):
-        """Unpause the player."""
-        self.player_request('pause 0')
-
-    def toggle_pause(self):
-        """Play/Pause Toggle."""
-        self.player_request('pause')
+    def pause(self, state=None):
+        """Pause the player.
+        If state is not specified toggle pause, else pause is state is true and unpause if
+        false."""
+        if state is None:
+            self.player_request('pause')
+        else:
+            self.player_request(f'pause {1 if state else 0}')
 
     def next(self):
         """Play next item in playlist."""
@@ -363,7 +365,7 @@ class Player:
         self._print_track(res['titles_loop'][0])
 
 
-def print_status(player, natural_indexing=True):
+def print_status(player: Player, natural_indexing=True):
     res = player.player_request('status')
     state = 'off'
     if res['power'] == 1:
@@ -389,7 +391,18 @@ def print_status(player, natural_indexing=True):
     print(f'{player.name} [{state}] {curtrack} {position}')
 
 
-def command_setcurrent(player, args):
+def command_players(server: Server, args):
+    players = server.enumerate_players()
+    if args.verbose:
+        maxname = max(len(p.name) for p in players)
+        for p in players:
+            print(f'{"*" if p.isplaying else " "} {p.name:{maxname}}  {p.model}')
+    else:
+        for p in players:
+            print(p.name)
+
+
+def command_setcurrent(player: Player, args):
     if len(args.args) < 1:
         raise LMSArgumentError('Missing index for setcurrent')
     try:
@@ -402,7 +415,7 @@ def command_setcurrent(player, args):
     player.setcurrent(curr)
 
 
-def command_playinginfo(player, args):
+def command_playinginfo(player: Player, args):
     if len(args.args) < 1:
         raise LMSArgumentError('Missing index for playinginfo')
     try:
@@ -412,7 +425,7 @@ def command_playinginfo(player, args):
     player.playinginfo(item)
 
 
-def command_search(player, args):
+def command_search(player: Player, args):
     if len(args.args) < 1:
         raise LMSArgumentError('no search type specified [artists|albums|tracks]')
     searchtype = args.args[0].lower()
@@ -423,7 +436,7 @@ def command_search(player, args):
     method(term, maxitems=args.maxitems)
 
 
-def command_match(player, args):
+def command_match(player: Player, args):
     if len(args.args) < 1:
         raise LMSArgumentError('no match type specified [artists|albums|tracks]')
     searchtype = args.args[0].lower()
@@ -444,7 +457,7 @@ def command_match(player, args):
     method(term, param=param, maxitems=args.maxitems)
 
 
-def command_enqueue(player, args):
+def command_enqueue(player: Player, args):
     if len(args.args) < 1:
         raise LMSArgumentError('no enqueue item type specified [artists|albums|tracks]')
     if len(args.args) < 2:
@@ -458,7 +471,7 @@ def command_enqueue(player, args):
     method(items, args.enqueue_method)
 
 
-def command_info(player, args):
+def command_info(player: Player, args):
     if len(args.args) < 1:
         raise LMSArgumentError('no info type specified [artists|albums|tracks]')
     if len(args.args) < 2:
@@ -474,21 +487,31 @@ def command_info(player, args):
     method(itemid)
 
 
-def dispatch_command(player, args):
-    playercmds = ['status','play','pause','stop','next','prev','poweron','poweroff','vup','vdown','volume']
+def dispatch_command(player: Player, args):
+    # no arg player commands
+    simplecmds = ['play','pause','stop','next','prev','poweron','poweroff','vup','vdown']
+    # complex commands
+    othercmds = ['players','status','volume','playing','setcurrent','playinginfo','search','match','enqueue','info']
+
+    allcmds = simplecmds + othercmds
     cmd = args.command.lower()
-    if cmd not in playercmds:
-        matches = [m for m in playercmds if m.startswith(cmd)]
+    if cmd not in allcmds:
+        matches = [m for m in allcmds if m.startswith(cmd)]
         if len(matches) == 1:
             cmd = matches[0]
         elif len(matches) > 1:
             mstr = "[" + ", ".join(matches) + "]"
             raise LMSArgumentError(f"command prefix '{cmd}' is not unique. could be {mstr}")
-    # special case player commands
-    if cmd == 'status':
+    # server commands
+    if cmd == 'players':
+        command_players(player.server, args)
+    # simple player commands
+    elif cmd in simplecmds:
+        method = getattr(player, cmd)
+        method()
+    # other player commands
+    elif cmd == 'status':
         print_status(player)
-    elif cmd == 'pause':
-        player.toggle_pause()
     elif cmd == 'volume':
         vol = None  # print the volume if nothing specified
         if len(args.args) > 0:
@@ -497,11 +520,6 @@ def dispatch_command(player, args):
             except ValueError:
                 raise LMSArgumentError(f"volume must be a number '{args.args[0]}'")
         player.volume(vol)
-    # standard player commands
-    elif cmd in playercmds:
-        method = getattr(player, cmd)
-        method()
-    # other functions
     elif cmd == 'playing':
         player.playing(0, args.maxitems)
     elif cmd == 'setcurrent':
@@ -521,7 +539,7 @@ def dispatch_command(player, args):
         raise LMSArgumentError(f"invalid command '{cmd}'")
 
 
-def execute_command(player, args):
+def execute_command(player: Player, args):
     # status header
     if args.status_header:
         print_status(player, not args.zero_indexing)
@@ -535,6 +553,7 @@ def execute_command(player, args):
 def main():
     helpextra = '''
 COMMAND:
+  players
   status
   play
   pause
@@ -571,13 +590,13 @@ ENVIRONMENT VARIABLES:
     default_host = os.environ.get('LMS_DEFAULT_HOST')
     default_player = os.environ.get('LMS_DEFAULT_PLAYER')
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     description='A simple script for interacting with the Logitech Media Server.',
+                                     description='A simple script to control a Lyrion Music Server.',
                                      epilog=helpextra)
     parser.add_argument('-a','--host', required=not default_host, default=default_host,
                         help='LMS hostname')
     parser.add_argument('-p','--port', type=int, default=9000,
                         help='LMS port (default: %(default)s)')
-    parser.add_argument('-n','--player', required=not default_player, default=default_player,
+    parser.add_argument('-n','--player', default=default_player,
                         help='player name')
     parser.add_argument('-Z','--zero-indexing', action='store_true',
                         help='use zero indexing for playlist entries')
@@ -592,8 +611,10 @@ ENVIRONMENT VARIABLES:
     parser.add_argument('-e','--enqueue-method', default='add',
                         choices=['play','insert','add'],
                         help='method used to enqueue tracks for the enqueue command (default: add)')
+    parser.add_argument('-v','--verbose', action='store_true',
+                        help='include extra information in output')
     parser.add_argument('command', nargs='?', default=None,
-                        help='player command')
+                        help='command')
     parser.add_argument('args', nargs='*', help='command arguments')
 
     if len(sys.argv) < 2:
@@ -602,10 +623,13 @@ ENVIRONMENT VARIABLES:
     args = parser.parse_args()
 
     server = Server(args.host, args.port)
-    player = server.find_player(args.player)
-    if not player:
-        print("LMS player not found:", args.player, file=sys.stderr)
-        sys.exit(1)
+    if args.player:
+        player = server.find_player(args.player)
+        if not player:
+            print("LMS player not found:", args.player, file=sys.stderr)
+            sys.exit(1)
+    else:
+        player = Player(server)  # unspecified player
     if args.trim_id:
         player.trim_id = True
     if args.zero_indexing:

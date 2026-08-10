@@ -326,9 +326,9 @@ class TestDispatchCommand(unittest.TestCase):
             lms.dispatch_command(self.player, self._args("bogus"))
 
     def test_unique_prefix_resolves_to_full_command(self):
-        self.player.play = MagicMock()
-        lms.dispatch_command(self.player, self._args("pl"))  # only "play" matches
-        self.player.play.assert_called_once()
+        self.player.next = MagicMock()
+        lms.dispatch_command(self.player, self._args("ne"))  # only "next" matches
+        self.player.next.assert_called_once()
 
     def test_ambiguous_prefix_raises(self):
         # "p" matches play, pause, prev, poweron, poweroff
