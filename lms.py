@@ -288,9 +288,6 @@ class Player:
     def _enqueue(self, itemtype : str, items: list[str], method: str):
         if method not in ["play","insert","add"]:
             raise LMSArgumentError(f"{method} is not a valid enqueue method [play|insert|add]")
-        if items == ['-']:
-            # read items from stdin
-            items = sys.stdin.readlines()
         items = [iid[0] for item in items if (iid:=str(item).split(maxsplit=1))]
         if not items:
             return  # do nothing if no items are provided
