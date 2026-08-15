@@ -50,29 +50,29 @@ class TestSafeInt(unittest.TestCase):
 
 class TestFormatDuration(unittest.TestCase):
     def test_basic(self):
-        self.assertEqual(lms._format_duration(65), "1:05")
+        self.assertEqual(lms.format_duration(65), "1:05")
 
     def test_zero(self):
-        self.assertEqual(lms._format_duration(0), "0:00")
+        self.assertEqual(lms.format_duration(0), "0:00")
 
     def test_over_an_hour(self):
         # 3661 seconds = 61 minutes, 1 second (no separate hour field)
-        self.assertEqual(lms._format_duration(3661), "61:01")
+        self.assertEqual(lms.format_duration(3661), "61:01")
 
     def test_accepts_float_input(self):
-        self.assertEqual(lms._format_duration(90.7), "1:30")
+        self.assertEqual(lms.format_duration(90.7), "1:30")
 
     def test_under_a_minute(self):
-        self.assertEqual(lms._format_duration(59), "0:59")
+        self.assertEqual(lms.format_duration(59), "0:59")
 
     def test_exactly_one_minute(self):
-        self.assertEqual(lms._format_duration(60), "1:00")
+        self.assertEqual(lms.format_duration(60), "1:00")
 
     def test_one_second_before_an_hour(self):
-        self.assertEqual(lms._format_duration(3599), "59:59")
+        self.assertEqual(lms.format_duration(3599), "59:59")
 
     def test_exactly_one_hour(self):
-        self.assertEqual(lms._format_duration(3600), "60:00")
+        self.assertEqual(lms.format_duration(3600), "60:00")
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ def make_server():
 
 def make_player(mac="00:11:22:33:44:55"):
     """Build a Player instance while skipping the real find_player() lookup."""
-    player = lms.Player(make_server(), "Kitchen", mac)
+    player = lms.Player(make_server(), mac, "Kitchen")
     return player
 
 
@@ -153,7 +153,7 @@ class TestServerRequest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Player._build_search() - search-term / parameter-search parsing
+# Player._build_search() & _build_match() - search-term / parameter-search parsing
 # ---------------------------------------------------------------------------
 
 class TestBuildSearch(unittest.TestCase):
@@ -161,41 +161,32 @@ class TestBuildSearch(unittest.TestCase):
         self.player = make_player()
 
     def test_plain_term_becomes_search_prefix(self):
-        self.assertEqual(self.player._build_search("miles", None), "search:miles")
+        self.assertEqual(self.player._build_search("miles"), "search:miles")
 
     def test_empty_term_with_no_param_is_empty(self):
-        self.assertEqual(self.player._build_search("", None), "")
+        self.assertEqual(self.player._build_search(""), "")
 
     def test_param_search_uses_param_as_prefix(self):
-        result = self.player._build_search("123", "artist_id")
+        result = self.player._build_match("artist_id", "123")
         self.assertEqual(result, "artist_id:123")
 
     def test_plain_term_is_trimmed(self):
         self.assertEqual(
-            self.player._build_search("  miles  ", None),
+            self.player._build_search("  miles  "),
             "search:miles",
         )
 
     def test_param_search_term_is_trimmed(self):
         self.assertEqual(
-            self.player._build_search(" 123 ", "artist_id"),
+            self.player._build_match("artist_id", " 123 "),
             "artist_id:123",
         )
 
     def test_trim_id_keeps_only_first_field(self):
         self.player.trim_id = True
         term = "123" + " " * 5 + "Miles Davis"  # first 8 chars -> "123     "
-        result = self.player._build_search(term, "artist_id")
+        result = self.player._build_match("artist_id", term)
         self.assertEqual(result, "artist_id:123")
-
-    @patch("sys.stdin", io.StringIO("55\n"))
-    def test_dash_reads_term_from_stdin(self):
-        result = self.player._build_search("-", None)
-        self.assertEqual(result, "search:55")
-
-    @patch("sys.stdin", io.StringIO(""))
-    def test_dash_with_empty_stdin_returns_empty_search(self):
-        self.assertEqual(self.player._build_search("-", None), "")
 
 
 # ---------------------------------------------------------------------------
@@ -277,11 +268,9 @@ class TestVolume(unittest.TestCase):
         self.player.volume(100)
         self.player.player_request.assert_called_once_with("mixer", "volume", 100)
 
-    def test_no_argument_prints_current_volume(self):
-        with patch("builtins.print") as mock_print:
-            self.player.volume(None)
+    def test_no_argument_returns_current_volume(self):
+        self.assertEqual(self.player.volume(), self.CURRENT_VOLUME)
         self.player.player_request.assert_called_once_with("mixer", "volume", "?")
-        mock_print.assert_called_once_with("Volume:", self.CURRENT_VOLUME)
 
 
 # ---------------------------------------------------------------------------
