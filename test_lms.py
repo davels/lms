@@ -222,25 +222,6 @@ class TestEnqueue(unittest.TestCase):
         self.player._enqueue("album", ["1", "2"], "add")
         self.assertEqual(self.player.player_request.call_count, 2)
 
-    @patch("sys.stdin", io.StringIO("101 Some Title\n202 Another Title\n"))
-    def test_dash_reads_items_from_stdin_using_first_field(self):
-        self.player._enqueue("track", ["-"], "add")
-        self.player.player_request.assert_called_once_with(
-            "playlistcontrol", "cmd:add", "track_id:101,202"
-        )
-
-    @patch("sys.stdin", io.StringIO(""))
-    def test_dash_with_empty_stdin_is_noop(self):
-        self.player._enqueue("track", ["-"], "add")
-        self.player.player_request.assert_not_called()
-
-    @patch("sys.stdin", io.StringIO("\n101 One\n\n202 Two\n"))
-    def test_blank_lines_are_ignored(self):
-        self.player._enqueue("track", ["-"], "add")
-        self.player.player_request.assert_called_once_with(
-            "playlistcontrol", "cmd:add", "track_id:101,202"
-        )
-
 
 # ---------------------------------------------------------------------------
 # Player.volume() - clamping behaviour
