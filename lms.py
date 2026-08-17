@@ -418,7 +418,7 @@ def command_search(player: Player, args):  # typename search_term
     searchtype = args.args[0].lower()
     if searchtype not in ["artists","albums","tracks"]:
         raise LMSArgumentError(f"{searchtype} is not a valid search type [artists|albums|tracks]")
-    term = args.args[1] if len(args.args) > 1 else None
+    term = args.args[1] if len(args.args) > 1 else ''
     method = getattr(player, "search_"+searchtype)
     method(term, maxitems=args.maxitems)
 
@@ -429,7 +429,7 @@ def command_match(player: Player, args):  # typename tagged_param
     searchtype = args.args[0].lower()
     if searchtype not in ["artists","albums","tracks"]:
         raise LMSArgumentError(f"{searchtype} is not a valid match type [artists|albums|tracks]")
-    term = args.args[1] if len(args.args) > 1 else None
+    term = args.args[1] if len(args.args) > 1 else ''
     if not term: return
     idtag = None
     tagkeys = ("artist_id","album_id","track_id")
