@@ -8,17 +8,25 @@ A simple python script for interacting with the Lyrion Music Server using the co
 
 ## Setup
 
-Clone the repository, then install using pip from the project directory. This will install it to site-packages and create an `lms` command.
+### Install
+There are a few options for installation.
 
+If you have [pipx](https://pipx.pypa.io/latest/index.html), you can install directly from github.
+```shell
+pipx install git+https://github.com/davels/lms.git
+```
+
+You can also clone the repository and install using pip. On distributions that use an externally managed Python environment (such as recent Ubuntu releases), this won't work and you should use one of the other options.
 ```shell
 git clone https://github.com/davels/lms.git
 cd lms
 pip install .
 ```
 
-Alternatively, on Linux, you could place lms.py somewhere in your path and create a symlink
+Alternatively, on Linux, you could place a symlink to lms.py somewhere in your path
 ``` shell
-> ln -s /path/to/lms.py lms
+git clone https://github.com/davels/lms.git
+ln -s /path/to/lms.py lms
 ```
 
 ### Specify the server and player using environment variables:
